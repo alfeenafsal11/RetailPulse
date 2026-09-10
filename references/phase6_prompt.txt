@@ -1,0 +1,982 @@
+You are executing **exactly one project phase** in the RetailPulse project.
+
+# PHASE 6 — STREAMLIT ANALYTICS DASHBOARD
+
+## 1. Read project context first
+
+Read these files in this order:
+
+1. `project_state/STATE.md`
+2. `resources/IMPLEMENTATION_PLAN.md`
+3. `resources/prompts/PHASE_06_DASHBOARD.md`
+4. `project_state/phases/phase_06_dashboard.md`
+5. `project_state/DECISIONS.md`
+6. `AGENTS.md`
+
+Then inspect the completed implementation:
+
+### Database
+
+* `database/schema.sql`
+* `database/seed.py`
+
+### SQL
+
+* `sql/analytics/kpis.sql`
+* `sql/analytics/customer_metrics.sql`
+* `sql/analytics/rfm.sql`
+* `sql/analytics/cohorts.sql`
+* `sql/analytics/category_analysis.sql`
+* `sql/analytics/revenue_concentration.sql`
+* `sql/analytics/top_customers.sql`
+
+### Python analytics layer
+
+* `src/analytics/db.py`
+* `src/analytics/queries.py`
+* `src/analytics/analytics.py`
+
+### Validation
+
+* `tests/test_analytics.py`
+* `tests/test_python_analytics.py`
+
+### Performance documentation
+
+* `sql/performance/benchmark_analysis.md`
+
+Verify:
+
+* Phase 2 = PASS
+* Phase 3 = PASS
+* Phase 4 = PASS
+* Phase 5 = PASS
+* PostgreSQL 16.4 is available
+* `load_all_analytics()` is functioning
+* the current Python layer loads the live analytical SQL files
+
+Do not redo completed phases unless an actual defect is discovered.
+
+---
+
+# 2. Phase objective
+
+Build a **clean, functional Streamlit dashboard** that communicates the project's analytical findings using the existing Python analytics layer.
+
+The dashboard should answer:
+
+> What is happening in the retail business, which customers matter most, where is revenue coming from, and where should customer engagement efforts be focused?
+
+The application should demonstrate:
+
+* live database-backed analytics
+* SQL/Python integration
+* business-oriented data visualization
+* customer segmentation
+* retention analysis
+* revenue analysis
+* clear analytical communication
+
+This is intended to become the project's **live hosted data analytics project**.
+
+---
+
+# 3. Critical architecture rule
+
+Do NOT bypass the existing architecture.
+
+The dashboard must use:
+
+```text
+Streamlit
+    ↓
+src/analytics/analytics.py
+    ↓
+sql/analytics/*.sql
+    ↓
+PostgreSQL
+```
+
+Do not make the dashboard directly execute ad-hoc SQL everywhere.
+
+Do not load the raw transaction CSV into Streamlit and perform the entire analytics workload in pandas.
+
+Do not duplicate the SQL analytical logic in the dashboard.
+
+The existing Python analytics layer is the dashboard's interface.
+
+---
+
+# 4. Keep the dashboard intentionally simple
+
+The application should be a **single coherent analytics dashboard**, not a multi-page enterprise application.
+
+Do not introduce:
+
+* React
+* FastAPI
+* JavaScript frameworks
+* authentication
+* microservices
+* Redis
+* Kafka
+* Spark
+* Airflow
+* dbt
+* Kubernetes
+* LLM agents
+
+unless explicitly required by the implementation plan.
+
+Use Streamlit and the existing Python stack.
+
+---
+
+# 5. Inspect current dependencies
+
+Use the existing `requirements.txt`.
+
+Add Streamlit and any genuinely required visualization dependency if not already present.
+
+Do not add unnecessary libraries.
+
+Prefer the smallest dependency set capable of producing a polished dashboard.
+
+---
+
+# 6. Application structure
+
+Inspect the existing `app/` directory.
+
+Create the Streamlit entry point according to the existing project conventions.
+
+A reasonable structure is:
+
+```text id="f4r7qv"
+app/
+    app.py
+```
+
+If supporting modules are genuinely useful, keep them minimal.
+
+The dashboard should be launchable using a straightforward command such as:
+
+```text
+streamlit run app/app.py
+```
+
+Document the actual command used.
+
+---
+
+# 7. Dashboard architecture
+
+Implement:
+
+```text id="n4h3jc"
+app.py
+   ↓
+load_all_analytics()
+   ↓
+DataFrames
+   ↓
+dashboard sections
+```
+
+Do not create a second database abstraction inside the Streamlit app.
+
+Use the existing:
+
+```text
+src.analytics.analytics.load_all_analytics()
+```
+
+or the equivalent established interface.
+
+---
+
+# 8. Dashboard header
+
+Create a clear title such as:
+
+```text
+RetailPulse
+Customer Retention & Revenue Analytics
+```
+
+Include a concise subtitle explaining the analytical purpose.
+
+The dashboard should immediately communicate that this is a **retail customer analytics platform** rather than a generic pandas demo.
+
+---
+
+# 9. KPI section
+
+At the top, present the core KPIs.
+
+At minimum:
+
+* Total Revenue
+* Active Customers
+* Transactions
+* Average Order Value
+* Repeat Purchase Rate
+
+Use Streamlit KPI/card components such as `st.metric`.
+
+Format values appropriately:
+
+```text
+Revenue → currency
+Customers → integer
+Transactions → integer
+AOV → currency
+Repeat rate → percentage
+```
+
+Do not convert the underlying DataFrame values into strings before calculations.
+
+Only format them at presentation time.
+
+---
+
+# 10. Revenue trend
+
+Create a clear monthly revenue visualization.
+
+Use the existing KPI time-series dataset.
+
+Show:
+
+```text
+x-axis = month
+y-axis = revenue
+```
+
+Use an appropriate Streamlit-compatible chart.
+
+Do not recompute monthly revenue from the raw transactions.
+
+The SQL layer already provides this analytical result.
+
+Include a meaningful title such as:
+
+> Monthly Revenue Trend
+
+---
+
+# 11. Revenue by category
+
+Use the existing category analytics DataFrame.
+
+Create a visualization showing revenue by product category.
+
+A bar chart is preferred because categories are discrete and need comparison.
+
+Display:
+
+* category
+* revenue
+
+Optionally communicate transaction count/AOV through tooltips or an accompanying table.
+
+Do not obscure category names with unnecessary visual effects.
+
+---
+
+# 12. RFM customer segmentation
+
+Create a prominent RFM section.
+
+Show:
+
+* customer count by segment
+* revenue by segment
+
+Use an appropriate visualization such as a bar chart.
+
+Also provide a compact supporting table containing relevant metrics.
+
+The purpose is to answer:
+
+> Which customer groups are most valuable?
+
+---
+
+# 13. RFM segment integrity
+
+Important:
+
+Phase 5 reported:
+
+```text
+RFM Summary: (6, 7)
+```
+
+while the project originally discussed five named segments:
+
+```text
+Champions
+Loyal
+New
+At Risk
+Lost
+```
+
+Before building the visualization:
+
+1. inspect the actual RFM SQL output
+2. determine what the sixth row represents
+3. determine whether it is a legitimate analytical category or an implementation artifact
+
+If it is a legitimate category:
+
+* preserve it
+* display it accurately
+* do not silently delete it
+
+If it is caused by an SQL classification defect:
+
+* fix the SQL at the source
+* rerun Phase 3/5 validation
+* document the correction
+* only then continue dashboard work
+
+Do not conceal an analytical inconsistency at the presentation layer.
+
+---
+
+# 14. Cohort retention heatmap
+
+Use the Phase 5 pivoted cohort DataFrame.
+
+Create a retention heatmap showing:
+
+```text
+rows    = cohort month
+columns = months since first purchase
+values  = retention rate
+```
+
+Make the visualization readable.
+
+Use percentage formatting where appropriate.
+
+Do not generate retention values in Python from raw transactions.
+
+The Python layer has already prepared the cohort matrix.
+
+Handle missing values clearly.
+
+Do not make the heatmap so large or visually dense that it becomes unreadable.
+
+---
+
+# 15. Revenue concentration
+
+Create a visualization for customer revenue concentration.
+
+Use the existing concentration DataFrame.
+
+Communicate the relationship between:
+
+```text
+customer coverage
+vs
+cumulative revenue share
+```
+
+A line chart or similarly intuitive visualization is appropriate.
+
+The user should be able to understand:
+
+> How much revenue is generated by the highest-value fraction of customers?
+
+Use the actual Phase 3 methodology.
+
+Do not reinterpret the concentration percentages.
+
+---
+
+# 16. Top customers
+
+Create a table showing the highest-value customers.
+
+Use the existing top-customer DataFrame.
+
+Show relevant columns such as:
+
+* customer_id
+* total revenue
+* transaction count
+* AOV
+* last purchase date
+
+Limit the display to the existing top-20 dataset.
+
+Format monetary/date fields appropriately.
+
+Do not add unnecessary customer attributes.
+
+---
+
+# 17. Customer-level exploration
+
+If practical within the single-page design, provide a lightweight customer exploration mechanism.
+
+For example:
+
+* select a customer ID
+* display that customer's metrics
+
+Useful fields include:
+
+* total revenue
+* transaction count
+* AOV
+* first purchase
+* last purchase
+* days since last purchase
+* RFM segment if available
+
+Do not implement a complex customer-management interface.
+
+This is analytics exploration, not CRM software.
+
+---
+
+# 18. Business interpretation
+
+The dashboard should not merely display charts.
+
+Where useful, add concise text explaining what a visualization answers.
+
+Examples:
+
+```text
+Customer Segmentation
+RFM segmentation identifies customers based on observed purchasing behavior.
+
+Cohort Retention
+Retention is measured relative to each customer's first observed purchase month.
+
+Revenue Concentration
+This shows how cumulative customer revenue changes as progressively larger portions of the customer base are included.
+```
+
+Keep interpretations factual.
+
+Do not invent causal explanations.
+
+Do not claim that a customer segment "will churn" unless the analysis actually establishes that.
+
+---
+
+# 19. Dashboard filters
+
+Add only useful filters.
+
+Potential filters include:
+
+* category
+* RFM segment
+
+Only implement filters if they can be applied cleanly without undermining the SQL/Python architecture.
+
+Do not add filters simply because dashboards often have filters.
+
+If implementing filters would require downloading the entire transaction table into pandas, do not do it.
+
+Keep the dashboard architecture efficient.
+
+---
+
+# 20. Data refresh behavior
+
+The dashboard should retrieve analytical data from PostgreSQL.
+
+Use Streamlit caching appropriately if useful, such as caching database-derived data for a reasonable duration.
+
+However:
+
+* do not cache indefinitely
+* do not cache secrets
+* do not create stale-data behavior that is difficult to understand
+
+If the dataset is static for this project, a modest cache is acceptable.
+
+Document the chosen approach.
+
+---
+
+# 21. Database failure handling
+
+If PostgreSQL is unavailable, the application should fail clearly.
+
+Do not silently switch to:
+
+* CSV
+* SQLite
+* hard-coded sample values
+
+A useful user-facing message can explain that the PostgreSQL backend is unavailable.
+
+Do not expose passwords or connection details.
+
+---
+
+# 22. Visual design
+
+Keep the visual design professional and restrained.
+
+Prioritize:
+
+* readable titles
+* consistent numeric formatting
+* logical section ordering
+* adequate spacing
+* clear labels
+* sensible chart sizes
+* minimal clutter
+
+Avoid:
+
+* decorative animations
+* excessive emojis
+* unnecessary custom CSS
+* dashboard gimmicks
+* excessive color coding
+* visually confusing charts
+
+The objective is to communicate analysis, not demonstrate frontend tricks.
+
+---
+
+# 23. Recommended page structure
+
+A strong structure is:
+
+```text id="8n1s3f"
+RetailPulse
+Customer Retention & Revenue Analytics
+
+[KPI] [KPI] [KPI] [KPI] [KPI]
+
+Monthly Revenue Trend
+
+Revenue by Category        RFM Segmentation
+
+Cohort Retention
+
+Revenue Concentration
+
+Top Customers
+
+Customer Explorer
+```
+
+Adjust if the actual datasets make another layout clearer.
+
+Do not create unnecessary pages.
+
+---
+
+# 24. Validate dashboard data before rendering
+
+Before rendering major sections, validate that the expected DataFrames are present.
+
+For example:
+
+```text id="1q6l3m"
+kpis
+customer_metrics
+rfm
+cohorts
+category
+revenue_concentration
+top_customers
+```
+
+If a required dataset is missing, fail clearly rather than displaying an incomplete dashboard as if it were correct.
+
+Do not duplicate all Python analytics tests inside Streamlit.
+
+---
+
+# 25. Dashboard tests
+
+Create appropriate tests where practical.
+
+At minimum verify:
+
+* application imports successfully
+* analytics layer loads
+* expected datasets exist
+* expected columns exist
+* dashboard code does not contain hard-coded analytical values
+* database-backed values are used
+
+Do not attempt brittle pixel-level UI testing unless the existing environment specifically supports it.
+
+Focus on application/data integration correctness.
+
+---
+
+# 26. Run the application locally
+
+Actually start the Streamlit application.
+
+Verify:
+
+* application launches
+* database connection works
+* KPIs render
+* charts render
+* tables render
+* RFM output renders
+* cohort heatmap renders
+* revenue concentration renders
+* no traceback occurs during normal page load
+
+Do not report successful rendering based solely on static code inspection.
+
+If browser-based verification is available, use it.
+
+If not, at minimum execute the application and perform the strongest available smoke test.
+
+---
+
+# 27. Check for analytical regressions
+
+Run:
+
+```text
+tests/test_analytics.py
+tests/test_python_analytics.py
+```
+
+after dashboard integration.
+
+The dashboard must not alter the underlying analytical results.
+
+Verify key invariants remain true:
+
+```text
+Revenue = $53,581,128.12
+Transactions = 245,210
+Active customers = 10,000
+```
+
+Do not hard-code these values into the application.
+
+Use them only for validation where appropriate.
+
+---
+
+# 28. Preserve Phase 4 optimization
+
+Confirm that the dashboard continues to consume the optimized:
+
+```text
+sql/analytics/customer_metrics.sql
+```
+
+Do not introduce a slower replacement query from inside the dashboard.
+
+The project's Phase 4 performance story must remain intact.
+
+---
+
+# 29. Deployment preparation
+
+This phase should prepare the application for the planned public deployment.
+
+Inspect the existing project decision:
+
+```text
+ADR-005: Streamlit Cloud deployment
+```
+
+Ensure the application has the configuration structure required for deployment.
+
+Do not deploy yet unless the Phase 6 implementation plan explicitly includes deployment.
+
+The next phase will handle deployment/final hosting if that is the planned boundary.
+
+Prepare:
+
+* requirements
+* entry-point
+* safe configuration
+* README instructions
+* secrets strategy
+
+Do not commit secrets.
+
+---
+
+# 30. README update
+
+Update the README with local dashboard instructions.
+
+Document:
+
+1. PostgreSQL prerequisite
+2. environment variables
+3. database startup requirement
+4. how to launch Streamlit
+5. expected application entry point
+
+Do not include real credentials.
+
+Keep the instructions reproducible.
+
+---
+
+# 31. Documentation/state
+
+Update:
+
+```text id="k9h5u3"
+project_state/STATE.md
+project_state/EVENTS.md
+project_state/METRICS.md
+project_state/phases/phase_06_dashboard.md
+```
+
+Update `DECISIONS.md` only if a meaningful dashboard architecture decision is made.
+
+Record:
+
+* dashboard architecture
+* sections implemented
+* actual smoke-test result
+* application startup behavior
+* database integration
+* RFM sixth-category investigation
+* deployment readiness
+* problems/deviations
+* plan compliance
+
+---
+
+# 32. Events
+
+Record meaningful events using the established event format.
+
+At minimum include:
+
+```text id="6s7l9p"
+PHASE_STARTED
+STREAMLIT_APP_CREATED
+DASHBOARD_DATA_INTEGRATION_COMPLETED
+DASHBOARD_SMOKE_TEST_COMPLETED
+ANALYTICAL_REGRESSION_VALIDATION
+DEPLOYMENT_PREPARATION_COMPLETED
+PHASE_COMPLETED
+```
+
+Do not record events for operations that did not actually occur.
+
+---
+
+# 33. Metrics
+
+Record actual values where useful:
+
+* dashboard startup time if measured
+* number of dashboard sections
+* analytics datasets consumed
+* smoke-test status
+* validation status
+* RFM category count
+* deployment-readiness status
+
+Do not fabricate timing measurements.
+
+---
+
+# 34. Git hygiene
+
+Do not commit:
+
+* `.env`
+* passwords
+* PostgreSQL binaries
+* PostgreSQL data directory
+* generated CSVs
+* local caches
+* temporary files
+
+Check:
+
+```text
+git status
+```
+
+before completion.
+
+---
+
+# 35. Failure handling
+
+If the dashboard does not launch:
+
+1. diagnose the issue
+2. fix it
+3. rerun the application
+4. rerun relevant tests
+5. only report PASS after successful validation
+
+If the RFM sixth-category issue reveals an actual analytical bug:
+
+* do not hide it
+* correct it at the SQL source
+* rerun affected analytics validation
+* document the change
+* then continue
+
+If PostgreSQL is unavailable:
+
+* start the existing portable PostgreSQL instance
+* verify connection
+* retry
+
+Do not substitute CSV or SQLite.
+
+---
+
+# 36. Scope boundary
+
+When Phase 6 is complete:
+
+**STOP.**
+
+Do NOT automatically proceed to:
+
+* cloud deployment
+* Streamlit Cloud publishing
+* final project audit
+* README polishing beyond what is required for Phase 6
+* additional features
+
+Those belong to the next phase.
+
+---
+
+# 37. Final completion report
+
+Return a compact evidence-based report:
+
+```text id="a7f9k2"
+PHASE REPORT
+
+Phase:
+PHASE_06_DASHBOARD
+
+Status:
+PASS / FAIL / BLOCKED
+
+Objective:
+
+Plan Compliance:
+PASS / PARTIAL / FAIL
+
+Application:
+- Entry point:
+- Streamlit version:
+- Launch command:
+- Local startup:
+- Database connectivity:
+
+Dashboard Sections:
+- KPI cards:
+- Revenue trend:
+- Category analysis:
+- RFM segmentation:
+- Cohort retention:
+- Revenue concentration:
+- Top customers:
+- Customer explorer:
+
+RFM Category Check:
+- Actual category count:
+- Categories:
+- Sixth-category explanation:
+- Corrected / preserved:
+
+Data Integration:
+- Analytics datasets consumed:
+- SQL/Python architecture preserved:
+- Optimized customer_metrics query preserved:
+
+Validation:
+- Application smoke test:
+- KPI rendering:
+- Charts:
+- Tables:
+- Cohort heatmap:
+- RFM:
+- Database failure handling:
+- `test_analytics.py`:
+- `test_python_analytics.py`:
+
+Deployment Readiness:
+- requirements:
+- configuration:
+- secrets handling:
+- Streamlit entry point:
+- README instructions:
+
+Performance:
+- Startup time if measured:
+- Other measured timings:
+
+Files Created/Modified:
+- ...
+
+Problems:
+- None / ...
+
+Decisions:
+- ...
+
+Current State:
+- ...
+
+Next Phase:
+PHASE_07_DEPLOYMENT_AND_FINALIZATION
+
+Next Phase Resource Prompt:
+resources/prompts/PHASE_07_DEPLOYMENT.md
+
+Recommended Next Action:
+- ...
+
+Resume Instructions:
+STATE → IMPLEMENTATION_PLAN → PHASE_07 prompt → Phase 7 execution
+```
+
+Use actual values.
+
+# Final instruction
+
+Execute **PHASE_06_DASHBOARD only**.
+
+Build the Streamlit dashboard on top of the existing PostgreSQL → SQL → Python analytics architecture.
+
+Do not duplicate analytical logic in Streamlit.
+
+Investigate the reported six-row RFM summary before rendering it.
+
+Actually launch and smoke-test the application.
+
+Run the existing analytics and Python analytics tests after integration.
+
+Do not deploy yet unless the existing Phase 6 resource prompt explicitly requires deployment.
+
+Do not fabricate application behavior, screenshots, metrics, or validation results.
+
+Update persistent project state and logs.
+
+When Phase 6 is genuinely complete—or genuinely blocked—return the completion report and **STOP**.

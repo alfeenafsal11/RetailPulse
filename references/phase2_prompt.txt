@@ -1,0 +1,687 @@
+You are executing **exactly one project phase** in the RetailPulse project.
+
+# PHASE 2 — PostgreSQL Database & Data Loading
+
+## 1. Read project context before doing anything
+
+Read these files in this order:
+
+1. `project_state/STATE.md`
+2. `resources/IMPLEMENTATION_PLAN.md`
+3. `resources/prompts/PHASE_02_DATABASE.md`
+4. `project_state/phases/phase_02_database.md`
+5. `project_state/DECISIONS.md`
+6. `AGENTS.md`
+
+Also inspect the relevant Phase 1 implementation and outputs as needed:
+
+* `src/data_generator.py`
+* `tests/test_data.py`
+* `tests/test_reproducibility.py`
+* `data/raw/customers.csv`
+* `data/raw/products.csv`
+* `data/raw/transactions.csv`
+
+Do not assume the Phase 2 prompt is sufficient by itself. The implementation plan, current state, decisions, and actual Phase 1 outputs are authoritative project context.
+
+Confirm:
+
+* Phase 0 = complete
+* Phase 1 = PASS
+* Phase 2 = authorized
+* `data/raw/` contains the generated CSVs
+* the repository is intact
+* no later-phase implementation has already been introduced unexpectedly
+
+If there is a discrepancy between the resource prompt and actual project state, investigate it and document the discrepancy rather than silently overriding it.
+
+---
+
+# 2. Phase objective
+
+Implement the **PostgreSQL database layer** for RetailPulse and load the deterministic Phase 1 synthetic retail dataset into it.
+
+The target is a clean, analytically useful relational/star-schema foundation that will support:
+
+* customer analytics
+* product/category analytics
+* transaction/revenue analytics
+* RFM segmentation
+* cohort retention
+* revenue concentration
+* SQL query-performance experiments in Phase 4
+
+This phase is about **database/schema/loading correctness**.
+
+Do NOT implement the analytics layer, dashboard, performance experiment, or deployment yet.
+
+---
+
+# 3. Preserve the agreed architecture
+
+Phase 0 established:
+
+* PostgreSQL rather than SQLite
+* star-schema-oriented structure
+* approximately 250K transactions
+* deterministic dataset with seed `42`
+
+Do not replace PostgreSQL with SQLite or another database merely for convenience.
+
+Do not introduce unnecessary infrastructure such as:
+
+* Docker/Kubernetes
+* Spark
+* Kafka
+* Airflow
+* dbt
+* Redis
+* FastAPI
+* React
+* cloud deployment
+* authentication
+
+unless the existing implementation plan explicitly requires it.
+
+Keep the implementation minimal and appropriate for the project's scope.
+
+---
+
+# 4. Inspect the actual Phase 1 schema first
+
+Before writing the database schema, inspect the CSV headers, representative rows, data types, null patterns, ID uniqueness, and relationships.
+
+The database schema must correspond to the actual generated dataset rather than an assumed schema.
+
+Expected conceptual entities are:
+
+### Dimension: customers
+
+Relevant attributes include:
+
+* customer_id
+* signup_date
+* city
+* age_group
+* gender
+* acquisition_channel
+* customer_segment_ground_truth
+
+### Dimension: products
+
+Relevant attributes include:
+
+* product_id
+* category
+* subcategory
+* price
+* cost
+
+### Fact: transactions
+
+Relevant attributes include:
+
+* transaction_id
+* customer_id
+* transaction_timestamp
+* product_id
+* quantity
+* unit_price
+* discount
+* amount
+* payment_method
+* channel
+
+Preserve the distinction between:
+
+**generation-time ground truth**
+
+and
+
+**future analytical segmentation**.
+
+`customer_segment_ground_truth` exists as part of the synthetic-data generation process. Do not use it as a substitute for calculating RFM/customer segments later.
+
+---
+
+# 5. Database design
+
+Create a PostgreSQL schema appropriate for analytical workloads.
+
+At minimum establish:
+
+```text
+customers
+products
+transactions
+```
+
+Use appropriate:
+
+* primary keys
+* foreign keys
+* data types
+* NOT NULL constraints where justified
+* CHECK constraints where appropriate
+* indexes where justified
+
+Do not blindly index every column.
+
+The project specifically needs to demonstrate understanding of query performance, so indexes should be deliberate and explainable.
+
+Consider the analytical access patterns that later phases will need, particularly:
+
+* transactions by customer
+* transactions by product
+* transactions by timestamp/date
+* joins between transactions and dimensions
+
+Document the rationale for important indexes.
+
+---
+
+# 6. Data types and integrity
+
+Use PostgreSQL-native types appropriately.
+
+Examples:
+
+* IDs → integer/bigint as appropriate
+* dates → `DATE`
+* timestamps → `TIMESTAMP` or `TIMESTAMPTZ`, based on the actual project convention
+* prices/revenue/cost → `NUMERIC` rather than floating-point where monetary exactness matters
+* quantity → integer/numeric as appropriate
+* categorical fields → appropriate textual types
+
+Ensure:
+
+```text
+amount = quantity * unit_price - discount
+```
+
+is preserved by the loaded data.
+
+Do not silently round or materially transform monetary values during loading.
+
+If the CSV representation requires a transformation for PostgreSQL storage, document it.
+
+---
+
+# 7. SQL/database files
+
+Organize database-related implementation cleanly.
+
+Use the existing repository structure, especially:
+
+```text
+database/
+sql/
+```
+
+Create appropriate SQL/schema files and/or loading scripts.
+
+The exact file names should follow the existing Phase 2 resource prompt and repository conventions.
+
+The resulting setup should be reproducible by another developer.
+
+A reasonable workflow is:
+
+```text
+CSV
+ ↓
+PostgreSQL schema
+ ↓
+bulk load
+ ↓
+integrity validation
+ ↓
+analytical database ready
+```
+
+Prefer efficient bulk loading such as PostgreSQL `COPY` rather than inserting 245K transactions one row at a time.
+
+---
+
+# 8. Loading strategy
+
+Load:
+
+1. customers
+2. products
+3. transactions
+
+in a dependency-safe order.
+
+The final database must contain approximately:
+
+* 10,000 customers
+* 500 products
+* 245,210 transactions
+
+Do not invent or fabricate counts.
+
+After loading, query PostgreSQL and record the actual counts.
+
+Verify that:
+
+* every transaction references an existing customer
+* every transaction references an existing product
+* transaction IDs are unique
+* customer IDs are unique
+* product IDs are unique
+* monetary fields are valid
+* quantities are valid
+* timestamps are valid
+
+Also verify the transaction date range against Phase 1:
+
+```text
+2024-07-01 → 2026-06-30
+```
+
+Use actual database queries for these checks.
+
+---
+
+# 9. Database validation
+
+Create appropriate validation tests/scripts for Phase 2.
+
+At minimum validate:
+
+### Row counts
+
+```text
+customers = 10,000
+products = 500
+transactions = 245,210
+```
+
+using actual loaded values.
+
+### Primary-key uniqueness
+
+Verify all relevant primary keys.
+
+### Foreign-key integrity
+
+Verify transaction → customer and transaction → product relationships.
+
+### Null/integrity checks
+
+Check important required columns.
+
+### Monetary consistency
+
+Check that the stored transaction amount corresponds to:
+
+```text
+quantity * unit_price - discount
+```
+
+within the exact precision convention selected for the database.
+
+### Date range
+
+Verify the earliest and latest transaction timestamps.
+
+### Basic analytical sanity
+
+Compare database aggregates against the source CSV where useful, such as:
+
+* total transaction count
+* total revenue
+* minimum/maximum transaction amount
+* revenue by category
+
+The purpose is to establish that loading did not alter the dataset.
+
+---
+
+# 10. Source-vs-database reconciliation
+
+This is important.
+
+Do not stop after verifying that PostgreSQL contains the expected row count.
+
+Perform at least one meaningful reconciliation between the source CSV and PostgreSQL.
+
+For example:
+
+```text
+CSV total revenue
+        vs
+PostgreSQL total revenue
+```
+
+and:
+
+```text
+CSV transaction count
+        vs
+PostgreSQL transaction count
+```
+
+The results must match according to the project's numeric precision convention.
+
+Record the actual values.
+
+Do not fabricate reconciliation results.
+
+---
+
+# 11. Indexing
+
+Implement only indexes justified by the project's expected analytical queries.
+
+At minimum think about the access patterns around:
+
+```text
+transactions.customer_id
+transactions.product_id
+transactions.transaction_timestamp
+```
+
+and relevant join keys.
+
+Do not prematurely create an excessive number of indexes.
+
+For every nontrivial index, document:
+
+1. what query/access pattern it supports
+2. why it is useful
+3. whether it has a meaningful storage/write tradeoff
+
+This will become important in Phase 4.
+
+Do not claim that an index improves performance unless it has actually been benchmarked.
+
+---
+
+# 12. Reproducibility
+
+A developer should be able to reproduce the database from the repository and locally generated Phase 1 data.
+
+The intended dependency is:
+
+```text
+src/data_generator.py
+        ↓
+data/raw/*.csv
+        ↓
+PostgreSQL initialization/loading
+```
+
+Do not add the 18MB transaction CSV to Git merely to make Phase 2 easier.
+
+The existing ADR-007 decision remains in force unless there is a concrete reason to change it.
+
+If a database initialization/loading command is created, document how to run it.
+
+---
+
+# 13. Tests and validation execution
+
+Actually execute the database initialization and loading process.
+
+Actually execute the validation queries/tests.
+
+Do not merely inspect SQL files and report success.
+
+Do not claim:
+
+* database initialized
+* data loaded
+* constraints verified
+* indexes created
+* reconciliation passed
+
+unless the corresponding operation was actually executed.
+
+If PostgreSQL is unavailable locally, determine whether the environment already provides a PostgreSQL instance/configuration.
+
+Do not silently substitute SQLite.
+
+If execution is genuinely blocked by missing infrastructure, stop and report the exact blocker instead of fabricating successful results.
+
+---
+
+# 14. Documentation
+
+Update the relevant project documentation/state files.
+
+At minimum:
+
+```text
+project_state/STATE.md
+project_state/EVENTS.md
+project_state/DECISIONS.md
+project_state/METRICS.md
+project_state/phases/phase_02_database.md
+```
+
+Record actual information, including where appropriate:
+
+* database/schema created
+* table names
+* actual row counts
+* data types/design decisions
+* indexes created
+* loading method
+* loading duration
+* validation results
+* source-vs-database reconciliation
+* problems encountered
+* decisions made
+* deviations from the implementation plan
+* plan compliance
+
+If an architectural decision is significant enough to affect later phases, add an ADR to `DECISIONS.md`.
+
+Do not create an ADR merely for routine implementation details.
+
+---
+
+# 15. Events
+
+Record meaningful phase events.
+
+At minimum include events corresponding to:
+
+```text
+PHASE_STARTED
+DATABASE_SCHEMA_CREATED
+DATA_LOAD_COMPLETED
+DATABASE_VALIDATION_COMPLETED
+SOURCE_DATABASE_RECONCILIATION
+PHASE_COMPLETED
+```
+
+Use the project's existing event format.
+
+Include actual values where appropriate.
+
+---
+
+# 16. Metrics
+
+Record measurable Phase 2 metrics in `project_state/METRICS.md`.
+
+Useful metrics include:
+
+* customers loaded
+* products loaded
+* transactions loaded
+* database load duration
+* validation duration
+* total revenue
+* earliest transaction timestamp
+* latest transaction timestamp
+* reconciliation status
+* indexes created
+
+Do not manufacture timing or performance numbers.
+
+---
+
+# 17. Git/data handling
+
+Do not commit the generated ~18MB transaction CSV simply because Phase 2 needs it.
+
+Keep following ADR-007.
+
+Ensure `.gitignore` behavior remains correct.
+
+Do not introduce Git LFS or external dataset hosting unless explicitly authorized.
+
+If database credentials/configuration are required:
+
+* do not commit secrets
+* use environment variables or an appropriate local configuration mechanism
+* provide a safe example configuration if needed
+
+Never place actual credentials in tracked files.
+
+---
+
+# 18. Scope boundary — critically important
+
+After Phase 2 is complete:
+
+**STOP.**
+
+Do NOT continue automatically into:
+
+* Phase 3 analytical SQL
+* RFM implementation
+* cohort analysis
+* revenue concentration analysis
+* Python analytics
+* Streamlit dashboard
+* deployment
+* Phase 4 performance benchmarking
+
+Phase 2 ends when the PostgreSQL database is correctly structured, populated, validated, and documented.
+
+The next phase will be authorized separately.
+
+---
+
+# 19. Failure handling
+
+If any required validation fails:
+
+1. investigate the root cause
+2. fix the Phase 2 implementation if appropriate
+3. rerun the affected validation
+4. record the issue and resolution
+5. only report PASS after actual validation succeeds
+
+If the issue cannot be resolved within Phase 2:
+
+* report FAIL or BLOCKED
+* document the exact reason
+* preserve useful diagnostics
+* STOP
+
+Do not proceed to Phase 3 with an unresolved database integrity problem.
+
+---
+
+# 20. Final completion report
+
+When finished, return a compact but evidence-based report using this structure:
+
+```text
+PHASE REPORT
+
+Phase:
+PHASE_02_DATABASE
+
+Status:
+PASS / FAIL / BLOCKED
+
+Objective:
+
+Plan Compliance:
+PASS / PARTIAL / FAIL
+
+Completed:
+- ...
+
+Database:
+- PostgreSQL version:
+- Schema:
+- Tables:
+- Indexes:
+
+Dataset Loaded:
+- Customers:
+- Products:
+- Transactions:
+- Date range:
+
+Validation:
+- Row counts:
+- PK uniqueness:
+- FK integrity:
+- Required fields:
+- Monetary consistency:
+- Timestamp range:
+- Aggregate sanity:
+
+Source ↔ Database Reconciliation:
+- Transaction count:
+- Total revenue:
+- Result:
+
+Performance:
+- Schema/load time:
+- Validation time:
+- Other measured timings:
+
+Git/Data Handling:
+- ...
+
+Files Created/Modified:
+- ...
+
+Problems:
+- None / ...
+
+Decisions:
+- ...
+
+Current State:
+- ...
+
+Next Phase:
+PHASE_03_ANALYTICS
+
+Next Phase Resource Prompt:
+resources/prompts/PHASE_03_ANALYTICS.md
+
+Recommended Next Action:
+- ...
+
+Resume Instructions:
+STATE → IMPLEMENTATION_PLAN → PHASE_03 prompt → phase_03_database/analytics state
+```
+
+Replace placeholders with **actual observed values**.
+
+Do not report planned values as measured values.
+
+## Final instruction
+
+Execute **only PHASE_02_DATABASE**.
+
+Follow the implementation plan completely.
+
+Preserve the existing project architecture and state system.
+
+Validate everything that you claim.
+
+Update persistent state and logs.
+
+Then **STOP and return the completion report**.

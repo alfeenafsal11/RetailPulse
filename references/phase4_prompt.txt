@@ -1,0 +1,957 @@
+You are executing **exactly one project phase** in the RetailPulse project.
+
+# PHASE 4 — PostgreSQL QUERY PERFORMANCE & INDEX OPTIMIZATION
+
+## 1. Read project context first
+
+Read these files in this order:
+
+1. `project_state/STATE.md`
+2. `resources/IMPLEMENTATION_PLAN.md`
+3. `resources/prompts/PHASE_04_PERFORMANCE.md`
+4. `project_state/phases/phase_04_performance.md`
+5. `project_state/DECISIONS.md`
+6. `AGENTS.md`
+
+Then inspect the relevant Phase 2 and Phase 3 implementation:
+
+* `database/schema.sql`
+* `database/seed.py`
+* `sql/analytics/kpis.sql`
+* `sql/analytics/customer_metrics.sql`
+* `sql/analytics/rfm.sql`
+* `sql/analytics/cohorts.sql`
+* `sql/analytics/category_analysis.sql`
+* `sql/analytics/revenue_concentration.sql`
+* `sql/analytics/top_customers.sql`
+* `tests/test_analytics.py`
+
+Verify:
+
+* Phase 2 = PASS
+* Phase 3 = PASS
+* PostgreSQL 16.4 is available
+* database contains 245,210 transactions
+* the existing indexes are known and documented
+
+Do not proceed if the database cannot be accessed.
+
+---
+
+# 2. Phase objective
+
+Perform a genuine PostgreSQL query-performance investigation.
+
+The goal is to demonstrate the complete performance-engineering workflow:
+
+```text
+Business query
+      ↓
+Baseline execution
+      ↓
+EXPLAIN ANALYZE
+      ↓
+Query-plan interpretation
+      ↓
+Bottleneck hypothesis
+      ↓
+Index/query/schema optimization
+      ↓
+EXPLAIN ANALYZE again
+      ↓
+Measured comparison
+      ↓
+Conclusion
+```
+
+The final result must be something that can be explained confidently in a technical interview.
+
+This phase is specifically intended to demonstrate the Xeno requirements around:
+
+* query performance diagnosis
+* indexing
+* joins
+* large-table analytical workloads
+* SQL optimization
+* evidence-based engineering decisions
+
+---
+
+# 3. Critical anti-fabrication rule
+
+Do NOT manufacture a performance improvement.
+
+Do NOT write:
+
+```text
+Query became 70% faster
+```
+
+unless actual measurements demonstrate that result.
+
+Do NOT claim:
+
+* index improved performance
+* sequential scan was replaced
+* execution time decreased
+* query planner selected an index
+* query became more efficient
+
+unless the actual PostgreSQL execution plan and timing support the claim.
+
+If an optimization produces little or no improvement, that is a valid engineering result.
+
+Document it.
+
+---
+
+# 4. Use the real PostgreSQL database
+
+All performance experiments must use the actual PostgreSQL 16.4 instance.
+
+Do not use:
+
+* SQLite
+* DuckDB
+* pandas
+* mocked query plans
+* EXPLAIN output generated without executing the query
+* theoretical estimates presented as measurements
+
+Use actual PostgreSQL:
+
+```text
+EXPLAIN (ANALYZE, BUFFERS, VERBOSE)
+```
+
+or an appropriately equivalent configuration.
+
+---
+
+# 5. Select performance workloads
+
+Start from the actual Phase 3 analytical queries.
+
+Candidate workloads already identified:
+
+1. `sql/analytics/rfm.sql`
+2. `sql/analytics/customer_metrics.sql`
+3. `sql/analytics/revenue_concentration.sql`
+
+Inspect these queries rather than automatically selecting one.
+
+Select **at least two** meaningful workloads for investigation, preferably with different performance characteristics.
+
+Strong candidates should involve combinations of:
+
+* large transaction-table scans
+* aggregation
+* joins
+* timestamp predicates
+* grouping
+* sorting
+* window functions
+
+Record why each selected workload is representative.
+
+---
+
+# 6. Establish a clean baseline
+
+Before modifying indexes or query structure, establish the baseline.
+
+For each selected workload:
+
+1. execute the query normally
+2. execute `EXPLAIN (ANALYZE, BUFFERS, VERBOSE)`
+3. capture the actual plan
+4. record execution time
+5. record planning time where available
+6. record relevant buffer statistics
+7. identify the major plan nodes
+
+Pay attention to:
+
+* Sequential Scan
+* Index Scan
+* Bitmap Heap Scan
+* Hash Join
+* Nested Loop
+* Merge Join
+* Sort
+* HashAggregate
+* GroupAggregate
+* WindowAgg
+* rows estimated vs actual
+* loops
+* shared hit blocks
+* shared read blocks
+* sort method
+* memory usage
+
+Do not simply paste an execution plan into the repository without interpreting it.
+
+---
+
+# 7. Understand PostgreSQL planner behavior
+
+For each baseline workload, identify:
+
+### Access path
+
+Is PostgreSQL using:
+
+* sequential scan?
+* index scan?
+* bitmap scan?
+
+### Join strategy
+
+Where joins exist, determine whether PostgreSQL uses:
+
+* Hash Join
+* Nested Loop
+* Merge Join
+
+and why that strategy is plausible.
+
+### Aggregation
+
+Identify:
+
+* HashAggregate
+* GroupAggregate
+* other aggregation nodes
+
+### Sorting/windowing
+
+Identify expensive:
+
+* Sort
+* WindowAgg
+* ranking operations
+
+### Cardinality
+
+Compare:
+
+```text
+estimated rows
+vs
+actual rows
+```
+
+Large discrepancies should be considered as possible planner-estimation issues.
+
+Do not automatically assume that every sequential scan is bad.
+
+A sequential scan over a large fraction of a table can legitimately be faster than using an index.
+
+This distinction is important.
+
+---
+
+# 8. Create a baseline record
+
+Create an appropriate artifact under:
+
+```text
+sql/performance/
+```
+
+following the existing repository conventions.
+
+It should document, for each workload:
+
+```text
+Query:
+Business purpose:
+Baseline SQL:
+Baseline execution time:
+Planning time:
+Buffers:
+Execution plan:
+Observed bottleneck:
+Optimization hypothesis:
+```
+
+Keep the artifact concise enough to remain readable.
+
+Do not dump unnecessary repeated plan output.
+
+---
+
+# 9. Index experiment
+
+Phase 2 currently created:
+
+```text
+idx_transactions_timestamp
+idx_transactions_customer
+idx_transactions_product
+```
+
+Do not assume these are optimal.
+
+Investigate whether the selected analytical workloads actually benefit from them.
+
+For each selected workload, reason about:
+
+```text
+query predicate
+        ↓
+join key
+        ↓
+grouping/sorting
+        ↓
+existing index
+        ↓
+planner decision
+```
+
+Where appropriate, perform a controlled experiment involving:
+
+* existing index
+* index disabled/removed or otherwise isolated for baseline
+* candidate index
+* optimized query/index combination
+
+The exact methodology must preserve database correctness.
+
+---
+
+# 10. Controlled index comparison
+
+If an existing index is relevant to the experiment, establish a legitimate baseline without it.
+
+For example, where appropriate:
+
+```text
+baseline:
+index absent / planner prevented from using it
+
+optimized:
+index present
+```
+
+or another scientifically sound methodology.
+
+Do not manipulate planner settings in a way that produces a misleading result.
+
+If `enable_seqscan`, `enable_indexscan`, or similar settings are used for diagnostic purposes, clearly label them as diagnostic experiments rather than real production configuration.
+
+Do not permanently alter PostgreSQL planner configuration.
+
+---
+
+# 11. Consider composite indexes
+
+Evaluate whether a composite index is more appropriate than the existing single-column indexes for at least one workload.
+
+For example, a query involving:
+
+```text
+customer_id
++
+transaction_timestamp
+```
+
+may have different access characteristics from queries involving either column independently.
+
+However:
+
+**Do not create a composite index simply to demonstrate that composite indexes exist.**
+
+Create one only if the workload and plan analysis justify it.
+
+Document:
+
+* why the composite index is relevant
+* column ordering
+* expected access pattern
+* actual planner behavior
+* measured result
+
+---
+
+# 12. Query-level optimization
+
+Where appropriate, investigate whether query structure itself contributes to cost.
+
+Potential areas include:
+
+* filtering earlier
+* reducing unnecessary columns
+* avoiding repeated aggregation
+* restructuring CTEs
+* reducing unnecessary joins
+* avoiding accidental row multiplication
+* replacing unnecessarily expensive constructs
+
+Do not rewrite queries merely for cosmetic reasons.
+
+Any query rewrite must preserve semantic correctness.
+
+---
+
+# 13. Correctness before performance
+
+This is mandatory.
+
+Every optimized query must produce the same analytical result as its baseline equivalent.
+
+Compare:
+
+* row counts
+* aggregate values
+* customer counts
+* revenue
+* relevant segment results
+
+The optimization is invalid if it changes the answer unintentionally.
+
+Performance improvement without semantic equivalence does not count.
+
+---
+
+# 14. Run multiple measurements
+
+Single-run timing is noisy.
+
+Where practical, run each benchmark multiple times.
+
+Record enough repetitions to distinguish an obvious performance difference from normal execution variance.
+
+At minimum capture:
+
+* baseline execution time
+* optimized execution time
+
+Prefer reporting:
+
+* multiple runs
+* median
+* minimum/maximum where useful
+
+Do not create artificial precision.
+
+For example, do not report:
+
+```text
+12.384729 ms
+```
+
+if PostgreSQL/environment variability makes that precision meaningless.
+
+Use the actual values produced by the experiment.
+
+---
+
+# 15. Cache-awareness
+
+Recognize that PostgreSQL caching can affect measurements.
+
+Record whether the workload was executed against:
+
+* warmed cache
+* cold-ish cache
+* mixed conditions
+
+Do not claim a cold-cache benchmark unless the experiment actually established that condition.
+
+For the primary comparison, consistency is more important than pretending to simulate production perfectly.
+
+A practical approach is to compare repeated executions under the same database state and clearly document the methodology.
+
+---
+
+# 16. Buffer analysis
+
+Use:
+
+```text
+EXPLAIN (ANALYZE, BUFFERS)
+```
+
+for the important experiments.
+
+Interpret:
+
+* shared hit
+* shared read
+* local blocks where applicable
+* temporary blocks where applicable
+
+Use this to support performance conclusions.
+
+For example:
+
+```text
+execution time decreased
++
+shared buffer reads decreased
+```
+
+is stronger evidence than execution time alone.
+
+Do not force this outcome.
+
+If buffers do not improve, report that.
+
+---
+
+# 17. Avoid misleading conclusions
+
+Do NOT use the following simplistic rule:
+
+```text
+Index exists → query is faster
+```
+
+Instead understand:
+
+```text
+Index usefulness depends on:
+selectivity
+query predicates
+table size
+data distribution
+join structure
+ordering
+planner cost estimates
+cache state
+```
+
+A sequential scan may legitimately remain optimal.
+
+If PostgreSQL chooses a sequential scan despite an index, explain why that can be reasonable.
+
+This explanation itself is valuable interview material.
+
+---
+
+# 18. Create a performance comparison artifact
+
+Create a clear performance summary under:
+
+```text
+sql/performance/
+```
+
+It should contain a table conceptually like:
+
+```text
+| Workload | Baseline | Optimized | Change | Main reason |
+|----------|----------|-----------|--------|-------------|
+```
+
+Use actual measurements.
+
+Include:
+
+* baseline execution time
+* optimized execution time
+* relative change
+* relevant plan change
+* buffer change where useful
+* optimization applied
+
+Calculate percentage improvement only from actual measurements.
+
+If performance worsens, record the regression.
+
+---
+
+# 19. Identify at least one meaningful lesson
+
+The final performance analysis should answer:
+
+> What did PostgreSQL actually do, why did it do it, and what changed after optimization?
+
+Examples of valid conclusions include:
+
+* an index enabled a more selective access path
+* an existing index was ignored because too many rows matched
+* a composite index better matched a filter pattern
+* aggregation remained the dominant cost
+* sorting/window functions dominated the workload
+* the query was already fast enough that optimization had negligible impact
+* a query rewrite reduced unnecessary work
+* the planner chose a sequential scan rationally
+
+Only report the conclusion supported by the experiment.
+
+---
+
+# 20. Candidate interview explanation
+
+Document a concise technical explanation for at least one optimization.
+
+The explanation should follow:
+
+```text
+Problem:
+The analytical query performed ...
+
+Diagnosis:
+EXPLAIN ANALYZE showed ...
+
+Hypothesis:
+The main cost was ...
+
+Change:
+I introduced/changed ...
+
+Validation:
+The optimized query returned the same result and ...
+
+Result:
+Execution changed from ... to ...
+
+Why:
+PostgreSQL changed the execution plan from ... to ...
+```
+
+This should be based entirely on actual measurements.
+
+This artifact is specifically intended to help explain the project during interviews.
+
+---
+
+# 21. Do not over-engineer the database
+
+Do NOT introduce:
+
+* partitioning
+* materialized views
+* sharding
+* replication
+* distributed SQL
+* Redis
+* Spark
+
+unless the implementation plan explicitly requires them.
+
+The project has only ~245K transactions.
+
+Partitioning a dataset of this size merely to demonstrate partitioning would be artificial and could weaken the project's credibility.
+
+The Xeno JD mentions partitioning as a concept, but this project does not need artificial infrastructure to claim understanding of it.
+
+If useful, you may document why partitioning was **not** selected for this workload.
+
+That is a better engineering answer than implementing unnecessary partitioning.
+
+---
+
+# 22. Preserve analytical correctness
+
+After every performance optimization:
+
+Run the relevant Phase 3 analytics validation.
+
+At minimum ensure:
+
+* total revenue remains `$53,581,128.12`
+* transaction count remains `245,210`
+* customer-level aggregation remains correct
+* relevant workload output matches its baseline
+* no join multiplication occurs
+
+Do not allow a performance optimization to silently change business results.
+
+---
+
+# 23. Tests
+
+Extend or create an appropriate performance validation script under `tests/` if useful.
+
+The test infrastructure should verify:
+
+* benchmark queries execute
+* optimized query output matches baseline
+* required indexes exist where expected
+* no analytical correctness regression occurs
+
+Do not make tests depend on exact execution-time thresholds.
+
+Machine/environment variability makes fixed timing thresholds unreliable.
+
+Instead test structural and semantic correctness.
+
+---
+
+# 24. Persistent state updates
+
+Update:
+
+```text id="t4o5pa"
+project_state/STATE.md
+project_state/EVENTS.md
+project_state/METRICS.md
+project_state/phases/phase_04_performance.md
+```
+
+Update `DECISIONS.md` when a meaningful database/performance decision is made.
+
+Record:
+
+* selected workloads
+* baseline measurements
+* bottlenecks
+* indexes evaluated
+* optimizations performed
+* post-optimization measurements
+* correctness results
+* planner observations
+* cache methodology
+* final conclusions
+* deviations
+* plan compliance
+
+---
+
+# 25. Events
+
+Record meaningful events using the existing project event format.
+
+At minimum include events corresponding to:
+
+```text id="znxvps"
+PHASE_STARTED
+PERFORMANCE_WORKLOADS_SELECTED
+BASELINE_PLANS_CAPTURED
+BOTTLENECK_ANALYSIS_COMPLETED
+INDEX_EXPERIMENT_COMPLETED
+OPTIMIZATION_COMPLETED
+OPTIMIZED_PLANS_CAPTURED
+PERFORMANCE_COMPARISON_COMPLETED
+CORRECTNESS_VALIDATION_COMPLETED
+PHASE_COMPLETED
+```
+
+Do not record events for actions that were not actually completed.
+
+---
+
+# 26. Metrics
+
+Record actual values in:
+
+```text
+project_state/METRICS.md
+```
+
+Include where applicable:
+
+* workload name
+* baseline execution time
+* optimized execution time
+* improvement/regression percentage
+* planning time
+* buffer statistics
+* relevant plan-node observations
+* index changes
+* correctness status
+
+Do not fabricate metrics.
+
+---
+
+# 27. Git hygiene
+
+Do not commit:
+
+* PostgreSQL binaries
+* PostgreSQL data directory
+* generated CSVs
+* credentials
+* `.env`
+* temporary benchmark dumps
+* unnecessarily large EXPLAIN outputs
+
+Commit the reusable SQL, benchmark methodology, documentation, and state files.
+
+Check:
+
+```text
+git status
+```
+
+before finishing.
+
+---
+
+# 28. Failure handling
+
+If a performance experiment does not produce an improvement:
+
+**That is not a failure.**
+
+Document:
+
+* what was tested
+* what PostgreSQL did
+* why the optimization did not help
+* what conclusion was reached
+
+If a query is already too fast for a meaningful difference, do not artificially inflate the dataset or fabricate timing.
+
+You may select a more representative workload or controlled diagnostic experiment.
+
+If PostgreSQL cannot be accessed, report BLOCKED.
+
+---
+
+# 29. Phase boundary
+
+When Phase 4 is complete:
+
+**STOP.**
+
+Do NOT proceed to:
+
+* Phase 5 Python analytics
+* Streamlit
+* deployment
+* additional ML/LLM functionality
+
+The next phase will be separately authorized.
+
+---
+
+# 30. Final completion report
+
+Return a compact but technically detailed report:
+
+```text id="6t0vft"
+PHASE REPORT
+
+Phase:
+PHASE_04_PERFORMANCE
+
+Status:
+PASS / FAIL / BLOCKED
+
+Objective:
+
+Plan Compliance:
+PASS / PARTIAL / FAIL
+
+PostgreSQL:
+- Version:
+- Connection:
+- Database:
+
+Selected Workloads:
+1. ...
+2. ...
+
+Baseline Analysis:
+
+Workload 1:
+- Business purpose:
+- Baseline execution time:
+- Planning time:
+- Key plan nodes:
+- Buffer statistics:
+- Bottleneck:
+- Estimated vs actual rows:
+
+Workload 2:
+- Business purpose:
+- Baseline execution time:
+- Planning time:
+- Key plan nodes:
+- Buffer statistics:
+- Bottleneck:
+- Estimated vs actual rows:
+
+Optimizations:
+- ...
+
+Indexes:
+- Existing indexes evaluated:
+- New indexes:
+- Removed/tested indexes:
+- Rationale:
+
+Performance Comparison:
+- Workload:
+- Baseline:
+- Optimized:
+- Change:
+- Plan change:
+- Buffer change:
+
+Correctness:
+- Baseline vs optimized result:
+- Revenue:
+- Transactions:
+- Customer metrics:
+- Analytical validation:
+
+Key Technical Findings:
+- ...
+
+Interview-Ready Optimization:
+- Problem:
+- Diagnosis:
+- Change:
+- Measurement:
+- Result:
+- Explanation:
+
+Phase 5 Candidate:
+- ...
+
+Files Created/Modified:
+- ...
+
+Problems:
+- None / ...
+
+Decisions:
+- ...
+
+Current State:
+- ...
+
+Next Phase:
+PHASE_05_PYTHON_ANALYTICS
+
+Next Phase Resource Prompt:
+resources/prompts/PHASE_05_ANALYTICS.md
+
+Recommended Next Action:
+- ...
+
+Resume Instructions:
+STATE → IMPLEMENTATION_PLAN → PHASE_05 prompt → Phase 5 execution
+```
+
+Use actual measured values.
+
+# Final instruction
+
+Execute **PHASE_04_PERFORMANCE only**.
+
+This phase must be an **actual PostgreSQL performance investigation**, not a theoretical indexing exercise.
+
+Use real `EXPLAIN ANALYZE` output.
+
+Diagnose the execution plan before changing anything.
+
+Make only justified optimizations.
+
+Measure before and after.
+
+Verify that optimized queries produce the same analytical results.
+
+Do not fabricate performance improvements.
+
+Do not introduce unnecessary infrastructure such as partitioning or distributed systems.
+
+Update all persistent project state and logs.
+
+When Phase 4 is genuinely complete—or genuinely blocked—return the completion report and **STOP**.

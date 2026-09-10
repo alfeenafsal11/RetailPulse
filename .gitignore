@@ -48,3 +48,7 @@ data/processed/*.parquet
 # Antigravity agent state (local only)
 .gemini/
 .agents/
+
+# PostgreSQL binaries
+database/pg/
+*.zip

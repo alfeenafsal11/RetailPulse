@@ -1,0 +1,1098 @@
+You are executing **exactly one project phase** in the RetailPulse project.
+
+# PHASE 7 — PUBLIC DEPLOYMENT & FINAL PROJECT FINALIZATION
+
+## 1. Read project context first
+
+Read these files in this order:
+
+1. `project_state/STATE.md`
+2. `resources/IMPLEMENTATION_PLAN.md`
+3. `resources/prompts/PHASE_07_DEPLOYMENT.md`
+4. `project_state/phases/phase_07_deployment.md`
+5. `project_state/DECISIONS.md`
+6. `AGENTS.md`
+
+Then inspect the complete project:
+
+### Database
+
+* `database/schema.sql`
+* `database/seed.py`
+
+### SQL
+
+* `sql/analytics/*.sql`
+* `sql/performance/*`
+
+### Python
+
+* `src/analytics/*.py`
+
+### Dashboard
+
+* `app/app.py`
+
+### Tests
+
+* `tests/*`
+
+### Documentation
+
+* `README.md`
+* `.env.example`
+
+Verify:
+
+* Phase 0 = PASS
+* Phase 1 = PASS
+* Phase 2 = PASS
+* Phase 3 = PASS
+* Phase 4 = PASS
+* Phase 5 = PASS
+* Phase 6 = PASS
+
+Do not redo completed phases unless deployment reveals an actual defect.
+
+---
+
+# 2. Phase objective
+
+Deploy RetailPulse as a **publicly accessible, database-backed Streamlit analytics application** and finalize the project so that another developer/interviewer can understand and reproduce it.
+
+The final production architecture should be:
+
+```text id="8n9m4a"
+User
+ ↓
+Public Streamlit application
+ ↓
+Python analytics layer
+ ↓
+Hosted PostgreSQL
+ ↓
+Analytical SQL
+```
+
+The deployment must use a **real hosted PostgreSQL database**.
+
+The existing local portable PostgreSQL server cannot be used as the production backend because:
+
+```text
+localhost
+```
+
+is local to the developer's machine and is not reachable by a cloud-hosted Streamlit application.
+
+---
+
+# 3. Critical deployment requirement
+
+A deployment is considered successful only when:
+
+1. the Streamlit application is publicly accessible
+2. the public application can connect to the hosted PostgreSQL database
+3. the analytical datasets load successfully
+4. KPIs render correctly
+5. charts/tables render correctly
+6. the public application does not depend on the developer's local PostgreSQL server
+
+Do NOT report deployment success merely because:
+
+```text
+streamlit run app/app.py
+```
+
+works locally.
+
+---
+
+# 4. Hosted PostgreSQL
+
+Provision a legitimate hosted PostgreSQL database using the simplest viable provider available under the project's constraints.
+
+The existing project decision is:
+
+```text
+ADR-005: Streamlit Cloud deployment
+```
+
+If the implementation plan specifies a particular PostgreSQL provider, follow it.
+
+Otherwise, choose a practical managed PostgreSQL provider that:
+
+* provides a real PostgreSQL database
+* can be accessed from Streamlit Cloud
+* provides connection credentials/environment variables
+* is suitable for this project's small synthetic dataset
+* does not require unnecessary infrastructure
+
+Do not introduce:
+
+* Kubernetes
+* self-managed cloud VMs
+* Docker infrastructure
+* distributed databases
+* managed Spark
+* Kafka
+
+The project only contains approximately 245K transactions.
+
+Prefer the simplest managed PostgreSQL solution.
+
+---
+
+# 5. Infrastructure constraints
+
+Before provisioning anything:
+
+* inspect available tooling
+* inspect existing project configuration
+* do not expose credentials
+* do not commit passwords
+* do not commit connection strings containing secrets
+* do not delete the working local PostgreSQL setup
+* do not break local development
+
+If the provider requires account authentication that cannot be performed in the current environment, report BLOCKED rather than fabricating deployment.
+
+Do not invent:
+
+* database credentials
+* project IDs
+* deployment URLs
+* provider resources
+* successful deployment states
+
+---
+
+# 6. Preserve local development
+
+The existing local development environment must remain usable.
+
+The architecture should support:
+
+```text id="q2c6z4"
+Local development
+    ↓
+local PostgreSQL
+    ↓
+.env
+
+Production
+    ↓
+hosted PostgreSQL
+    ↓
+Streamlit secrets/environment
+```
+
+Do not hard-code production credentials into Python.
+
+Do not make local development dependent on the hosted database unless that is explicitly intended.
+
+---
+
+# 7. Migrate the database schema
+
+Use:
+
+```text id="j9m7k1"
+database/schema.sql
+```
+
+to create the production PostgreSQL schema.
+
+Do not manually recreate tables through a provider GUI unless absolutely necessary.
+
+The production schema should match the validated local schema.
+
+Preserve:
+
+* customers
+* products
+* transactions
+* primary keys
+* foreign keys
+* constraints
+* indexes
+
+Do not introduce schema differences merely because the database is hosted.
+
+---
+
+# 8. Migrate the data
+
+Populate the hosted PostgreSQL database with the same deterministic Phase 1 dataset.
+
+The source of truth remains:
+
+```text id="z8xv4d"
+src/data_generator.py
+SEED=42
+```
+
+and/or the generated local CSVs in:
+
+```text
+data/raw/
+```
+
+Do not generate a different production dataset.
+
+Expected values:
+
+```text id="6b5t7k"
+Customers: 10,000
+Products: 500
+Transactions: 245,210
+Revenue: $53,581,128.12
+```
+
+These are validation targets, not values to blindly insert or hard-code.
+
+After loading the hosted database, query it and record the actual values.
+
+Prefer efficient bulk loading.
+
+Do not commit the generated CSVs merely to facilitate deployment.
+
+---
+
+# 9. Production database validation
+
+Before connecting Streamlit to the hosted database, perform the same fundamental validation used locally.
+
+Verify:
+
+### Counts
+
+* customers
+* products
+* transactions
+
+### Referential integrity
+
+* transaction → customer
+* transaction → product
+
+### Monetary consistency
+
+```text id="i2k6u4"
+amount = quantity * unit_price - discount
+```
+
+according to the existing precision convention.
+
+### Revenue
+
+Verify:
+
+```text id="t4v8w9"
+$53,581,128.12
+```
+
+from actual database aggregation.
+
+### Date range
+
+Verify the actual production data range.
+
+### Indexes
+
+Verify the expected production indexes exist.
+
+Do not assume that schema creation succeeded simply because the SQL command returned.
+
+---
+
+# 10. Source-to-production reconciliation
+
+Perform an actual reconciliation between:
+
+```text id="qk1m7p"
+local/source dataset
+        ↕
+hosted PostgreSQL
+```
+
+At minimum verify:
+
+```text id="g7m1ce"
+transaction count
+total revenue
+```
+
+match exactly.
+
+Also verify customer/product counts.
+
+Record actual results.
+
+If there is a mismatch:
+
+1. diagnose
+2. fix
+3. rerun
+4. document
+
+Do not proceed to public deployment with an unexplained discrepancy.
+
+---
+
+# 11. Production analytics validation
+
+Run the existing analytical SQL against the hosted database.
+
+Verify that:
+
+* KPI query works
+* customer metrics works
+* RFM works
+* cohort query works
+* category analysis works
+* revenue concentration works
+* top customers works
+
+The production analytical outputs should reconcile with the validated local results.
+
+At minimum compare:
+
+```text id="w4v0qf"
+total revenue
+transaction count
+active customers
+AOV
+RFM coverage
+category revenue
+```
+
+Do not require every individual floating-point display value to be textually identical if the difference is only presentation/precision formatting. Compare using the project's numeric precision convention.
+
+---
+
+# 12. Preserve Phase 4 optimization
+
+This is important.
+
+The production deployment must use the same optimized:
+
+```text id="5n3u1c"
+sql/analytics/customer_metrics.sql
+```
+
+that produced the Phase 4 optimization.
+
+Do not replace it with an earlier query.
+
+Do not rewrite the optimization merely for deployment.
+
+The final project should retain the technical story:
+
+```text
+baseline customer metrics
+~230 ms
+        ↓
+pre-aggregation before join
+        ↓
+~139 ms
+        ↓
+~39% measured improvement
+```
+
+Treat these as historical local benchmark results, not a promise about hosted performance.
+
+Do not rerun Phase 4 unless a deployment-specific issue requires it.
+
+---
+
+# 13. Configure Streamlit production secrets
+
+Configure the hosted Streamlit application to access PostgreSQL using secure secrets/environment configuration.
+
+Do not place:
+
+* passwords
+* connection strings
+* API keys
+
+in:
+
+* `app/app.py`
+* Git
+* README
+* `.env.example`
+
+Use the deployment platform's secrets mechanism.
+
+The application should retrieve configuration without exposing it to users.
+
+---
+
+# 14. Production configuration
+
+Ensure the application can run in the hosted environment.
+
+Inspect:
+
+```text id="m0c6r2"
+requirements.txt
+app/app.py
+src/
+database/
+```
+
+Ensure imports work from the Streamlit deployment environment.
+
+Avoid machine-specific paths.
+
+Do not reference:
+
+```text
+C:\
+D:\
+localhost-only files
+```
+
+for production database access.
+
+Do not depend on:
+
+```text
+data/raw/*.csv
+```
+
+at runtime.
+
+The production dashboard must use PostgreSQL through the analytics layer.
+
+---
+
+# 15. Deployment configuration
+
+Use the existing Streamlit deployment decision.
+
+Prepare the repository for the deployment platform.
+
+If the platform requires a specific configuration file or entry-point convention, implement only what is required.
+
+Do not add unnecessary CI/CD infrastructure.
+
+The deployment should have a clear entry point:
+
+```text id="d8g0s6"
+app/app.py
+```
+
+---
+
+# 16. Public application smoke test
+
+After deployment, actually access the public application.
+
+Verify:
+
+### Application
+
+* URL resolves
+* Streamlit application loads
+* no startup traceback
+
+### Database
+
+* hosted PostgreSQL connection succeeds
+
+### KPIs
+
+* revenue
+* customers
+* transactions
+* AOV
+* repeat purchase rate
+
+### Visualizations
+
+* monthly revenue
+* category revenue
+* RFM
+* cohort heatmap
+* revenue concentration
+
+### Tables
+
+* top customers
+* customer explorer
+
+### Error behavior
+
+Verify the application does not expose secrets or internal database credentials in user-visible errors.
+
+Do not report a PASS based solely on deployment-platform status.
+
+---
+
+# 17. Public-data correctness
+
+The public dashboard should continue to reflect the validated dataset.
+
+Verify at minimum:
+
+```text id="w5t9fd"
+Revenue = $53,581,128.12
+Transactions = 245,210
+Customers = 10,000
+```
+
+through the public application/backend.
+
+Do not hard-code these values into the dashboard.
+
+They must be database-derived.
+
+---
+
+# 18. Reproducibility
+
+The README should allow another developer to understand the complete pipeline:
+
+```text id="xq0g6a"
+Generate data
+     ↓
+Provision PostgreSQL
+     ↓
+Create schema
+     ↓
+Load data
+     ↓
+Run analytics
+     ↓
+Launch/deploy Streamlit
+```
+
+Document:
+
+* prerequisites
+* Python environment
+* dependency installation
+* local PostgreSQL setup
+* data generation
+* schema creation
+* database seeding
+* environment variables
+* local Streamlit launch
+* production deployment architecture
+
+Do not publish actual secrets.
+
+---
+
+# 19. Architecture documentation
+
+Update the README to include a concise architecture section.
+
+It should explain:
+
+```text id="q1v2r4"
+Synthetic retail data
+        ↓
+PostgreSQL star schema
+        ↓
+Analytical SQL
+        ↓
+Python/pandas data layer
+        ↓
+Streamlit dashboard
+```
+
+Also explain the separation of responsibility:
+
+### PostgreSQL
+
+* joins
+* aggregation
+* RFM
+* cohorts
+* revenue analysis
+
+### Python
+
+* SQL loading
+* type enforcement
+* validation
+* dashboard-ready transformations
+
+### Streamlit
+
+* presentation
+* interaction
+* visualization
+
+---
+
+# 20. Performance documentation
+
+Include a concise performance section in the README or project documentation.
+
+Document the actual Phase 4 finding:
+
+```text id="1v9vqt"
+customer_metrics baseline ≈ 230 ms
+optimized ≈ 139 ms
+≈39% improvement
+```
+
+Explain that the optimization came from:
+
+> pre-aggregating transactions by customer before joining to the customer dimension.
+
+Also document the RFM index experiment:
+
+> PostgreSQL's sequential scan remained preferable for the full-table aggregation workload.
+
+Do not imply that the 39% improvement is a hosted-production benchmark.
+
+Label it as the local PostgreSQL performance experiment.
+
+---
+
+# 21. Project positioning
+
+Update the README so that the project clearly communicates its relevance to data analytics/data engineering.
+
+The README should make the following technical capabilities obvious:
+
+* SQL analytics
+* PostgreSQL
+* joins
+* indexing
+* query optimization
+* `EXPLAIN ANALYZE`
+* customer segmentation
+* cohort retention
+* revenue concentration
+* Python/pandas
+* Streamlit
+* hosted analytics application
+
+Do not exaggerate the project.
+
+Do not claim:
+
+* production-scale infrastructure
+* distributed data processing
+* real customer data
+* machine-learning churn prediction
+* real-time streaming
+
+unless those actually exist.
+
+---
+
+# 22. Synthetic-data disclosure
+
+Clearly identify the dataset as **synthetic retail data**.
+
+Do not present the $53.58M revenue or customer behavior as real business data.
+
+The purpose is to demonstrate the analytics engineering workflow.
+
+---
+
+# 23. Final project structure audit
+
+Inspect the repository for:
+
+* dead files
+* obsolete scripts
+* duplicated analytics logic
+* temporary benchmark files
+* accidental credentials
+* unnecessary dependencies
+* generated artifacts
+* stale state information
+* references to localhost in production configuration
+* incorrect README instructions
+
+Do not perform a broad refactor.
+
+Make only justified cleanup changes.
+
+---
+
+# 24. Test the complete local pipeline
+
+Before finalizing, run the relevant automated tests.
+
+At minimum:
+
+```text id="zq5v1r"
+tests/test_data.py
+tests/test_reproducibility.py
+tests/test_analytics.py
+tests/test_python_analytics.py
+```
+
+Run any appropriate deployment/configuration smoke tests as well.
+
+Do not make tests dependent on the hosted database unless the test is explicitly intended to validate production connectivity.
+
+---
+
+# 25. Final security audit
+
+Search the repository for likely secret leakage.
+
+Check for:
+
+* passwords
+* connection strings
+* API keys
+* `.env`
+* private tokens
+* provider credentials
+
+Ensure:
+
+```text id="4s8kz9"
+.env
+```
+
+is ignored.
+
+Ensure:
+
+```text id="k6x2rm"
+.env.example
+```
+
+contains placeholders only.
+
+Do not print actual production credentials in the final report.
+
+---
+
+# 26. Git audit
+
+Run:
+
+```text id="v5k7qn"
+git status
+```
+
+and inspect the repository state.
+
+Ensure the repository does NOT contain:
+
+* PostgreSQL binaries
+* PostgreSQL data directory
+* generated CSVs
+* secrets
+* temporary deployment files
+* unnecessary local caches
+
+Do not delete useful project artifacts merely to make the repository smaller.
+
+---
+
+# 27. Final state consistency
+
+Update:
+
+```text id="9s6m0v"
+project_state/STATE.md
+project_state/EVENTS.md
+project_state/METRICS.md
+project_state/DECISIONS.md
+project_state/phases/phase_07_deployment.md
+```
+
+The final state must accurately describe:
+
+* local database
+* hosted database
+* public deployment
+* deployment URL
+* deployment status
+* final architecture
+* validation status
+* known limitations
+
+Do not leave the project state saying deployment is pending if deployment actually succeeded.
+
+Do not claim deployment success if it failed.
+
+---
+
+# 28. Events
+
+Record meaningful final-phase events using the existing event format.
+
+At minimum include:
+
+```text id="0l4q4c"
+PHASE_STARTED
+HOSTED_DATABASE_PROVISIONED
+PRODUCTION_SCHEMA_CREATED
+PRODUCTION_DATA_LOADED
+PRODUCTION_DATABASE_VALIDATED
+PRODUCTION_ANALYTICS_VALIDATED
+STREAMLIT_DEPLOYED
+PUBLIC_SMOKE_TEST_COMPLETED
+SECURITY_AUDIT_COMPLETED
+FINAL_PROJECT_VALIDATION_COMPLETED
+PHASE_COMPLETED
+```
+
+Only record events that actually occurred.
+
+If deployment is blocked, record the blocker instead.
+
+---
+
+# 29. Metrics
+
+Record actual final metrics in:
+
+```text id="7h9j2m"
+project_state/METRICS.md
+```
+
+Include:
+
+* hosted PostgreSQL version/provider
+* production customer count
+* production product count
+* production transaction count
+* production revenue
+* migration/load duration if measured
+* public deployment status
+* public URL if appropriate for the project state
+* public smoke-test result
+* final automated-test result
+
+Do not record secrets.
+
+---
+
+# 30. Final project validation
+
+The final project should satisfy all of these:
+
+```text id="p8n4ws"
+[✓] Synthetic data reproducible
+[✓] PostgreSQL database
+[✓] Star-schema structure
+[✓] Referential integrity
+[✓] Analytical SQL
+[✓] RFM segmentation
+[✓] Cohort retention
+[✓] Revenue concentration
+[✓] Query performance experiment
+[✓] Measured SQL optimization
+[✓] Python analytics layer
+[✓] Streamlit dashboard
+[✓] Hosted PostgreSQL
+[✓] Public Streamlit application
+[✓] Production smoke test
+[✓] No committed secrets
+[✓] README reproducibility
+[✓] Automated validation
+```
+
+Do not mark an item complete without evidence.
+
+---
+
+# 31. Important limitation handling
+
+If public deployment cannot be completed because:
+
+* provider authentication is unavailable
+* Streamlit deployment access is unavailable
+* hosted PostgreSQL cannot be provisioned
+* network restrictions prevent the required connection
+* the platform requires user interaction that cannot be performed
+
+then report:
+
+```text id="5p6q7r"
+Status: BLOCKED
+```
+
+Do NOT fake:
+
+* deployment URLs
+* cloud database credentials
+* successful public access
+* production validation
+
+Complete all parts that can legitimately be completed, document the blocker, and stop.
+
+---
+
+# 32. No unnecessary feature expansion
+
+This is the final implementation phase.
+
+Do NOT add:
+
+* LLM functionality
+* AI agents
+* churn prediction
+* recommendation models
+* authentication
+* real-time streaming
+* notification systems
+* advanced ML
+* complex frontend systems
+
+The project is already sufficiently scoped.
+
+The goal is to **finish and validate**, not expand the feature set.
+
+---
+
+# 33. Final completion report
+
+Return a compact but evidence-based report:
+
+```text id="7k2m1v"
+PHASE REPORT
+
+Phase:
+PHASE_07_DEPLOYMENT_AND_FINALIZATION
+
+Status:
+PASS / FAIL / BLOCKED
+
+Objective:
+
+Plan Compliance:
+PASS / PARTIAL / FAIL
+
+Local Environment:
+- PostgreSQL:
+- Local dashboard:
+- Automated tests:
+
+Hosted PostgreSQL:
+- Provider:
+- PostgreSQL version:
+- Host/database:
+- Schema migration:
+- Data migration:
+- Connection:
+- Security configuration:
+
+Production Dataset:
+- Customers:
+- Products:
+- Transactions:
+- Revenue:
+- Date range:
+
+Production Validation:
+- Row counts:
+- PK integrity:
+- FK integrity:
+- Monetary consistency:
+- Revenue reconciliation:
+- Analytics reconciliation:
+
+Public Streamlit:
+- Deployment platform:
+- Public URL:
+- Application startup:
+- Database connectivity:
+- KPI rendering:
+- Revenue trend:
+- Category chart:
+- RFM:
+- Cohort heatmap:
+- Revenue concentration:
+- Top customers:
+- Customer explorer:
+
+Performance:
+- Phase 4 local benchmark preserved:
+- Customer metrics baseline:
+- Customer metrics optimized:
+- Improvement:
+- Production benchmark:
+- Not measured / ...
+
+Security:
+- Secrets committed:
+- `.env` ignored:
+- Production secrets configured securely:
+
+Final Tests:
+- test_data.py:
+- test_reproducibility.py:
+- test_analytics.py:
+- test_python_analytics.py:
+- Deployment smoke test:
+
+Documentation:
+- README:
+- Architecture:
+- Setup instructions:
+- Deployment instructions:
+- Performance documentation:
+
+Files Created/Modified:
+- ...
+
+Problems:
+- None / ...
+
+Decisions:
+- ...
+
+Final Project State:
+- ...
+
+Deployment Status:
+- ...
+
+Public URL:
+- ...
+
+Known Limitations:
+- ...
+
+Recommended Next Action:
+- Final manual review / interview preparation
+
+Resume Instructions:
+Project implementation is complete. Review STATE.md and README.md for the final architecture and deployment details.
+```
+
+Use actual values.
+
+Do not expose credentials in the report.
+
+# Final instruction
+
+Execute **PHASE_07_DEPLOYMENT_AND_FINALIZATION only**.
+
+Provision a real hosted PostgreSQL backend.
+
+Migrate the validated schema and deterministic Phase 1 dataset.
+
+Connect the Streamlit application to the hosted database securely.
+
+Deploy the application publicly.
+
+Actually test the public application end-to-end.
+
+Preserve the SQL/Python/Streamlit architecture and the Phase 4 optimization.
+
+Perform the final security, repository, test, and documentation audits.
+
+Do not fabricate deployment results, URLs, credentials, or validation.
+
+If deployment is genuinely blocked by infrastructure or authentication limitations, report BLOCKED with the exact blocker rather than pretending the project is deployed.
+
+When Phase 7 is genuinely complete—or genuinely blocked—update all persistent state and return the final report.
+
+**This is the final implementation phase. Stop after the report.**

@@ -1,0 +1,651 @@
+You are resuming the **BLOCKED PHASE_02_DATABASE** of the RetailPulse project.
+
+This is a **recovery/retry of Phase 2**, not authorization to proceed to Phase 3.
+
+# 1. Read project context first
+
+Read these files in this exact order:
+
+1. `project_state/STATE.md`
+2. `resources/IMPLEMENTATION_PLAN.md`
+3. `resources/prompts/PHASE_02_DATABASE.md`
+4. `project_state/phases/phase_02_database.md`
+5. `project_state/DECISIONS.md`
+6. `AGENTS.md`
+
+Then inspect:
+
+* `data/raw/customers.csv`
+* `data/raw/products.csv`
+* `data/raw/transactions.csv`
+* `src/data_generator.py`
+
+The previous Phase 2 attempt was BLOCKED because:
+
+* PostgreSQL was not running on `localhost:5432`
+* `psql` was unavailable
+* Docker was unavailable
+* no remote PostgreSQL configuration existed
+
+This blocker was correctly reported.
+
+Do NOT mark Phase 2 complete yet.
+
+---
+
+# 2. Recovery objective
+
+First provision or otherwise make available a **real, usable PostgreSQL server** in the current development environment.
+
+Then execute the originally defined Phase 2 database work completely.
+
+The final goal remains:
+
+```text
+Phase 1 CSVs
+      ↓
+real PostgreSQL instance
+      ↓
+schema
+      ↓
+bulk data loading
+      ↓
+indexes
+      ↓
+validation
+      ↓
+source/database reconciliation
+      ↓
+Phase 2 PASS
+```
+
+Do not proceed to Phase 3.
+
+---
+
+# 3. PostgreSQL infrastructure requirements
+
+The database must be an actual PostgreSQL server capable of executing:
+
+* SQL DDL
+* SQL DML
+* joins
+* indexes
+* `EXPLAIN`
+* `EXPLAIN ANALYZE`
+
+This is important because later Phase 4 explicitly depends on PostgreSQL query-planner behavior.
+
+Therefore:
+
+### DO NOT substitute
+
+* SQLite
+* DuckDB
+* pandas
+* an in-memory mock
+* a fake database layer
+* SQLAlchemy-only emulation
+* CSV-based SQL
+* another relational database
+
+The project's PostgreSQL decision remains in force.
+
+---
+
+# 4. Determine the simplest viable provisioning method
+
+Inspect the environment before choosing an installation strategy.
+
+Check for available mechanisms such as:
+
+* PostgreSQL already installed under a nonstandard path
+* `winget`
+* Chocolatey
+* Scoop
+* an existing PostgreSQL service
+* an existing PostgreSQL installation directory
+* other legitimate package/install mechanisms available to the current user
+* an already available remote PostgreSQL connection
+
+Do not assume Docker is available; the previous phase already established that it is not.
+
+Prefer the **simplest reliable solution that gives the project an actual PostgreSQL server**.
+
+Possible approaches, in descending preference:
+
+1. Use an already installed PostgreSQL instance if one exists.
+2. Install PostgreSQL using an available package manager/system-supported mechanism.
+3. If a normal system installation is impossible because of environment restrictions, investigate a legitimate portable/user-space PostgreSQL installation that provides a real PostgreSQL server binary.
+4. If local provisioning is genuinely impossible but network access is available, use a legitimate hosted PostgreSQL instance only if credentials/configuration can be obtained without inventing them.
+
+Do not spend excessive time attempting unrelated infrastructure.
+
+---
+
+# 5. Infrastructure safety rules
+
+Before installing anything:
+
+* inspect what is already available
+* avoid destructive system changes
+* do not uninstall unrelated software
+* do not modify unrelated projects
+* do not expose credentials
+* do not commit credentials
+* do not create permanent services unless appropriate and clearly documented
+* do not silently change project architecture
+
+If administrative privileges are required and unavailable, do not fabricate success.
+
+If a user-space solution is viable, prefer it over requiring unnecessary administrator privileges.
+
+---
+
+# 6. Establish a reproducible PostgreSQL connection
+
+Once PostgreSQL is available, establish a connection configuration for RetailPulse.
+
+Prefer environment variables rather than hard-coded credentials.
+
+For example, conceptually:
+
+```text
+POSTGRES_HOST
+POSTGRES_PORT
+POSTGRES_DB
+POSTGRES_USER
+POSTGRES_PASSWORD
+```
+
+Do not commit a real `.env` containing credentials.
+
+If an example configuration is useful, create a safe example file such as:
+
+```text
+.env.example
+```
+
+containing placeholders only.
+
+If PostgreSQL is running locally with a trusted/no-password configuration, use the simplest appropriate configuration rather than unnecessarily introducing credential complexity.
+
+---
+
+# 7. Verify the server before continuing
+
+Actually connect to PostgreSQL.
+
+Record the actual:
+
+* host
+* port
+* database
+* PostgreSQL server version
+
+Run a real connectivity test.
+
+Do not proceed to schema creation until the connection succeeds.
+
+A successful connection must be demonstrated by an actual database operation, such as querying the PostgreSQL version.
+
+---
+
+# 8. Resume the original Phase 2 implementation
+
+After PostgreSQL infrastructure is available, continue with the complete Phase 2 implementation defined in:
+
+`resources/prompts/PHASE_02_DATABASE.md`
+
+Do not create a separate simplified database implementation merely because the previous attempt was blocked.
+
+Implement the agreed schema based on the actual Phase 1 data.
+
+The expected conceptual model remains:
+
+```text
+customers
+products
+transactions
+```
+
+with appropriate:
+
+* primary keys
+* foreign keys
+* data types
+* NOT NULL constraints where justified
+* CHECK constraints where justified
+* analytical indexes
+
+Preserve the star-schema-oriented architecture from ADR-006.
+
+---
+
+# 9. Load the actual Phase 1 data
+
+Use the existing files:
+
+```text
+data/raw/customers.csv
+data/raw/products.csv
+data/raw/transactions.csv
+```
+
+Expected approximate counts are:
+
+```text
+customers      10,000
+products          500
+transactions   245,210
+```
+
+These are expectations, not values to blindly assume.
+
+Query PostgreSQL after loading and record the actual counts.
+
+Prefer PostgreSQL bulk loading such as `COPY` rather than row-by-row insertion.
+
+Do not regenerate the dataset unless there is a demonstrated problem with the existing Phase 1 files.
+
+If regeneration is genuinely required, use the existing generator and seed `42`, then document why.
+
+---
+
+# 10. Validate the database thoroughly
+
+Actually execute database validation.
+
+Verify:
+
+### Primary keys
+
+* customer IDs unique
+* product IDs unique
+* transaction IDs unique
+
+### Foreign keys
+
+Every transaction must reference:
+
+* an existing customer
+* an existing product
+
+### Required fields
+
+Validate appropriate NOT NULL fields.
+
+### Monetary consistency
+
+Verify:
+
+```text
+amount = quantity * unit_price - discount
+```
+
+according to the database's chosen numeric precision.
+
+### Timestamp validity
+
+Verify the actual minimum and maximum transaction timestamps.
+
+Expected range from Phase 1:
+
+```text
+2024-07-01 → 2026-06-30
+```
+
+### Counts
+
+Record actual counts.
+
+### Aggregate sanity
+
+At minimum calculate:
+
+* total transaction count
+* total revenue
+* revenue by product category
+
+---
+
+# 11. Perform source ↔ database reconciliation
+
+This is mandatory.
+
+Compare source CSV values with PostgreSQL values.
+
+At minimum compare:
+
+```text
+CSV transaction count
+        ↔
+PostgreSQL transaction count
+```
+
+and:
+
+```text
+CSV total revenue
+        ↔
+PostgreSQL total revenue
+```
+
+Use an appropriate numeric precision convention.
+
+Do not report PASS unless the comparison has actually been executed.
+
+If there is a mismatch:
+
+1. investigate it
+2. identify whether it comes from parsing, precision, transformation, or loading
+3. fix the cause
+4. rerun the reconciliation
+5. document the resolution
+
+---
+
+# 12. Implement deliberate indexes
+
+Create only indexes justified by expected analytical access patterns.
+
+Consider:
+
+```text
+transactions.customer_id
+transactions.product_id
+transactions.transaction_timestamp
+```
+
+and relevant join/access paths.
+
+Do not index every column.
+
+For each important index, document:
+
+* index name
+* indexed column(s)
+* query/access pattern it supports
+* rationale
+
+Do not claim performance improvement yet.
+
+Phase 4 will measure query performance rigorously.
+
+---
+
+# 13. Test database reproducibility
+
+Ensure that another developer can understand how to:
+
+1. obtain/generate the Phase 1 CSVs
+2. provision/connect to PostgreSQL
+3. create the schema
+4. load the data
+5. validate the database
+
+Document the necessary commands.
+
+Do not commit the generated ~18MB transaction CSV.
+
+ADR-007 remains valid.
+
+---
+
+# 14. Update persistent state
+
+After successful execution, update:
+
+```text
+project_state/STATE.md
+project_state/EVENTS.md
+project_state/DECISIONS.md
+project_state/METRICS.md
+project_state/phases/phase_02_database.md
+```
+
+Record actual results.
+
+The Phase 2 state file must explicitly indicate:
+
+* infrastructure status
+* database status
+* implementation status
+* validation status
+* plan compliance
+* whether the previous blocker was resolved
+* current phase status
+
+Do not leave STATE.md saying Phase 2 is blocked if Phase 2 has subsequently passed.
+
+---
+
+# 15. Record the infrastructure decision
+
+If provisioning PostgreSQL required a meaningful deviation from the originally expected environment, add a decision/ADR explaining:
+
+* why the original environment was insufficient
+* how PostgreSQL was provisioned
+* why the selected approach was appropriate
+* whether the approach affects reproducibility
+* any limitations or cleanup instructions
+
+Do not create an ADR for trivial commands.
+
+---
+
+# 16. Events
+
+Record meaningful events, including at minimum:
+
+```text
+PHASE_02_RECOVERY_STARTED
+POSTGRES_INFRASTRUCTURE_PROVISIONED
+POSTGRES_CONNECTION_VERIFIED
+DATABASE_SCHEMA_CREATED
+DATA_LOAD_COMPLETED
+DATABASE_VALIDATION_COMPLETED
+SOURCE_DATABASE_RECONCILIATION
+PHASE_COMPLETED
+```
+
+If provisioning fails, record the appropriate failure/blocker event instead.
+
+Use the project's established event format.
+
+---
+
+# 17. Metrics
+
+Record actual measurable values in `project_state/METRICS.md`, including where available:
+
+* PostgreSQL version
+* customers loaded
+* products loaded
+* transactions loaded
+* database load duration
+* validation duration
+* total revenue
+* earliest transaction timestamp
+* latest transaction timestamp
+* reconciliation result
+* indexes created
+* infrastructure provisioning method
+
+Do not invent timings.
+
+---
+
+# 18. Git and secrets
+
+Do not commit:
+
+* `.env` containing real credentials
+* passwords
+* connection strings containing secrets
+* generated CSVs
+* temporary database files
+* unnecessary installation artifacts
+
+Do commit source/configuration/documentation that is appropriate for reproducing the project.
+
+Check `git status` before finishing.
+
+---
+
+# 19. Failure boundary
+
+If PostgreSQL still cannot be provisioned:
+
+STOP.
+
+Return:
+
+```text
+Status: BLOCKED
+```
+
+and report:
+
+* exactly what was attempted
+* exactly why it failed
+* what infrastructure is missing
+* whether administrator privileges are required
+* what the minimum next action is
+
+Do not proceed to Phase 3.
+
+Do not substitute another database.
+
+Do not fabricate measurements.
+
+---
+
+# 20. Phase boundary
+
+If PostgreSQL is successfully provisioned and Phase 2 passes all validation:
+
+STOP immediately after Phase 2.
+
+Do NOT execute:
+
+* Phase 3 analytics
+* RFM
+* cohort analysis
+* revenue concentration analysis
+* Phase 4 performance experiments
+* Python analytics
+* Streamlit
+* deployment
+
+The next phase will be separately authorized.
+
+---
+
+# 21. Final report
+
+Return a compact evidence-based report:
+
+```text
+PHASE REPORT
+
+Phase:
+PHASE_02_DATABASE_RECOVERY
+
+Status:
+PASS / BLOCKED / FAIL
+
+Previous Blocker:
+...
+
+Infrastructure:
+- Provisioning method:
+- PostgreSQL version:
+- Host:
+- Port:
+- Database:
+- Connection verification:
+
+Plan Compliance:
+PASS / PARTIAL / FAIL
+
+Completed:
+- ...
+
+Database:
+- Schema:
+- Tables:
+- Indexes:
+
+Dataset Loaded:
+- Customers:
+- Products:
+- Transactions:
+- Date range:
+
+Validation:
+- Row counts:
+- PK uniqueness:
+- FK integrity:
+- Required fields:
+- Monetary consistency:
+- Timestamp range:
+- Aggregate sanity:
+
+Source ↔ Database Reconciliation:
+- Transaction count:
+- Total revenue:
+- Result:
+
+Performance:
+- Provisioning time:
+- Load time:
+- Validation time:
+
+Git/Data Handling:
+- ...
+
+Files Created/Modified:
+- ...
+
+Problems:
+- ...
+
+Decisions:
+- ...
+
+Current State:
+- ...
+
+Next Phase:
+PHASE_03_ANALYTICS
+
+Next Phase Resource Prompt:
+resources/prompts/PHASE_03_ANALYTICS.md
+
+Recommended Next Action:
+- ...
+
+Resume Instructions:
+STATE → IMPLEMENTATION_PLAN → PHASE_03 prompt → Phase 3 execution
+```
+
+Use actual measured values.
+
+## Final instruction
+
+**Recover and complete PHASE_02_DATABASE only.**
+
+The previous BLOCKED status is valid and must be preserved in the event history.
+
+Resolve the PostgreSQL infrastructure problem using the simplest legitimate approach available in the environment.
+
+Then execute the complete Phase 2 database implementation and validation.
+
+**Do not substitute another database.**
+
+**Do not fabricate successful execution.**
+
+**Do not proceed to Phase 3.**
+
+When Phase 2 either genuinely passes or remains genuinely blocked, update the persistent state and return the final report, then STOP.

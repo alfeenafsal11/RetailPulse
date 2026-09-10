@@ -1,41 +1,57 @@
-# Phase 03 — Analytics
+# Phase 03 — Analytical SQL & Business Insights
 
-Status: NOT_STARTED
+Status: COMPLETE
 
-Objective: Implement KPI queries, RFM segmentation, cohort retention, customer/category analysis, revenue concentration.
+Objective: Build the core analytical SQL layer to answer business questions regarding revenue, customers, segmentation, and cohorts using PostgreSQL.
 
 Resource prompt: resources/prompts/PHASE_03_ANALYTICS.md
 
 Implementation-plan requirements:
-- sql/kpi_queries.sql (revenue, active customers, AOV, repeat rate, monthly trend)
-- sql/rfm.sql (R/F/M scores, segment mapping, documented rules)
-- sql/retention.sql (cohort month, months since acquisition, retention rate)
-- sql/customer_analysis.sql (category breakdown, revenue concentration)
-- src/analytics.py (Python wrapper returning DataFrames)
+- [x] Create KPI queries (revenue, customers, AOV, repeat purchase)
+- [x] Create customer-level aggregation metrics
+- [x] Implement RFM segmentation (derived independently from transactions)
+- [x] Create cohort retention analysis (by signup/first-purchase month)
+- [x] Analyze revenue by product category
+- [x] Calculate revenue concentration (Top 1%, 5%, 10%, 20%)
+- [x] Frame all SQL files around specific business questions
+- [x] Execute and validate all queries in PostgreSQL
 
-Inputs: Populated PostgreSQL database
+Inputs: 
+- Phase 2 PostgreSQL Database tables (customers, products, transactions)
 
 Outputs:
-- sql/kpi_queries.sql
-- sql/rfm.sql
-- sql/retention.sql
-- sql/customer_analysis.sql
-- src/analytics.py
+- sql/analytics/kpis.sql
+- sql/analytics/customer_metrics.sql
+- sql/analytics/rfm.sql
+- sql/analytics/cohorts.sql
+- sql/analytics/category_analysis.sql
+- sql/analytics/revenue_concentration.sql
+- sql/analytics/top_customers.sql
+- tests/test_analytics.py
 
-Implementation: Not started
+Validation: PASS
+- **Join Integrity**: Verified that joining transactions to dimensions (customers, products) preserves exact transaction row counts.
+- **Revenue Conservation**: RFM revenue sum and Category revenue sum reconcile perfectly with global total revenue ($53,581,128.12).
+- **Concentration**: Tested percentiles and cumulative revenue successfully. 
 
-Validation: Not started
+Plan compliance: PASS
 
-Plan compliance: Not started
+Actual metrics:
+- Total Revenue: $53,581,128.12
+- Total Transactions: 245,210
+- Active Customers: 10,000
+- AOV: $218.51
+- Repeat Purchase Rate: 100.00%
+- Revenue Concentration: Top 1% = 4.67%, Top 5% = 12.24%, Top 20% = 18.02%
+- Top Category: Electronics ($22,476,227.63)
 
-Problems: None
+Phase 4 Candidate Workloads:
+1. **RFM Segmentation (`rfm.sql`)**: Uses multiple heavy window functions (`NTILE(5)`) over aggregated transaction groupings. Ideal for EXPLAIN ANALYZE tuning.
+2. **Customer Metrics (`customer_metrics.sql`)**: Deep aggregations and multiple date calculations joining the large transaction table.
 
-Decisions: None yet
+Next phase: PHASE_04_PERFORMANCE (resources/prompts/PHASE_04_PERFORMANCE.md)
 
-Metrics: None yet
-
-Known limitations: None yet
-
-Next phase: PHASE_04_PERFORMANCE
-
-Resume instructions: Read STATE.md, then this file, then the phase prompt.
+Resume instructions:
+1. Ensure the database server is running (`pg_ctl start`).
+2. Read project_state/STATE.md and resources/IMPLEMENTATION_PLAN.md.
+3. Follow instructions in resources/prompts/PHASE_04_PERFORMANCE.md.

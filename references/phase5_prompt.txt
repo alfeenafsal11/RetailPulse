@@ -1,0 +1,924 @@
+You are executing **exactly one project phase** in the RetailPulse project.
+
+# PHASE 5 — PYTHON ANALYTICS & DASHBOARD DATA LAYER
+
+## 1. Read project context first
+
+Read these files in this order:
+
+1. `project_state/STATE.md`
+2. `resources/IMPLEMENTATION_PLAN.md`
+3. `resources/prompts/PHASE_05_ANALYTICS.md`
+4. `project_state/phases/phase_05_analytics.md`
+5. `project_state/DECISIONS.md`
+6. `AGENTS.md`
+
+Then inspect the completed analytical/database implementation:
+
+* `database/schema.sql`
+* `database/seed.py`
+* `sql/analytics/kpis.sql`
+* `sql/analytics/customer_metrics.sql`
+* `sql/analytics/rfm.sql`
+* `sql/analytics/cohorts.sql`
+* `sql/analytics/category_analysis.sql`
+* `sql/analytics/revenue_concentration.sql`
+* `sql/analytics/top_customers.sql`
+* `sql/performance/benchmark_analysis.md`
+* `tests/test_analytics.py`
+* `tests/benchmark.py`
+* `tests/optimize_customer_metrics.py`
+
+Verify:
+
+* Phase 2 = PASS
+* Phase 3 = PASS
+* Phase 4 = PASS
+* PostgreSQL 16.4 is available
+* the optimized `customer_metrics.sql` is the current version
+
+Do not redo completed phases unless an actual defect is discovered.
+
+---
+
+# 2. Phase objective
+
+Implement the **Python analytics/data-processing layer** that consumes the PostgreSQL analytical SQL outputs and prepares clean datasets for the eventual Streamlit dashboard.
+
+The objective is:
+
+```text id="1x0m0v"
+PostgreSQL
+    ↓
+analytical SQL
+    ↓
+Python
+    ↓
+pandas DataFrames
+    ↓
+dashboard-ready analytical datasets
+```
+
+This phase should demonstrate practical Python analytics skills while preserving the SQL layer as the primary analytical source.
+
+The Python layer must NOT become a second, conflicting analytics engine.
+
+---
+
+# 3. Critical architecture rule
+
+Prefer:
+
+> **SQL for database-intensive aggregation and relational analytics.**
+
+Use Python/pandas for:
+
+* retrieving SQL results
+* light transformation
+* reshaping
+* dashboard preparation
+* plotting-oriented data preparation
+* presentation-friendly calculations
+* combining already-computed analytical datasets where appropriate
+
+Do NOT unnecessarily pull the entire 245,210-row transaction table into pandas and redo all SQL analytics there.
+
+The project should demonstrate an appropriate division of responsibilities:
+
+```text id="yj8u6k"
+PostgreSQL:
+joins
+aggregations
+RFM
+cohorts
+revenue concentration
+category analysis
+
+Python:
+retrieval
+validation
+light transformation
+dashboard datasets
+visualization preparation
+```
+
+This distinction is important for both technical correctness and the Xeno role.
+
+---
+
+# 4. Inspect existing project dependencies
+
+Use the existing `requirements.txt`.
+
+Do not add libraries unless genuinely required.
+
+Expected useful libraries may include:
+
+* pandas
+* numpy
+* psycopg2 / psycopg2-binary
+* matplotlib
+
+If Streamlit is already part of the planned dependency set, do not prematurely build the dashboard.
+
+Do not introduce:
+
+* Spark
+* Polars
+* Dask
+* Airflow
+* dbt
+* FastAPI
+* React
+* LangChain
+* LangGraph
+* unnecessary visualization frameworks
+
+unless explicitly required by the implementation plan.
+
+---
+
+# 5. Design a clean Python analytics interface
+
+Inspect the existing `src/` structure.
+
+Create a small, maintainable Python analytics module or modules.
+
+A reasonable conceptual organization is:
+
+```text id="tdq8os"
+src/
+    analytics/
+        __init__.py
+        db.py
+        queries.py
+        analytics.py
+```
+
+Follow the implementation plan and existing repository conventions if they specify another structure.
+
+The architecture should make it easy for Phase 6 to call something conceptually like:
+
+```text id="0mxq22"
+load_kpis()
+load_customer_metrics()
+load_rfm()
+load_cohorts()
+load_category_analysis()
+load_revenue_concentration()
+load_top_customers()
+```
+
+Do not create an elaborate framework.
+
+---
+
+# 6. Database connection handling
+
+Implement a clean PostgreSQL connection mechanism.
+
+Use environment variables/configuration rather than hard-coded secrets.
+
+Respect the existing:
+
+```text
+.env.example
+```
+
+Do not commit real credentials.
+
+The Python layer should connect to:
+
+```text
+localhost:5432
+```
+
+using the project's established configuration.
+
+Do not silently fall back to SQLite or CSV files if PostgreSQL is unavailable.
+
+If the database is unavailable:
+
+1. attempt to start the existing portable PostgreSQL instance if appropriate
+2. if it remains unavailable, report BLOCKED
+3. do not replace the database
+
+---
+
+# 7. Reuse existing SQL
+
+The existing SQL analytics layer is authoritative.
+
+Do not duplicate large SQL strings inside Python if the existing `.sql` files can be loaded and executed.
+
+Prefer a structure where Python reads or references the canonical SQL artifacts.
+
+For example, conceptually:
+
+```text id="r0d5i5"
+sql/analytics/rfm.sql
+        ↓
+Python query loader
+        ↓
+PostgreSQL
+        ↓
+DataFrame
+```
+
+This keeps SQL independently inspectable and preserves the Phase 4 optimization.
+
+In particular, make sure Python uses the **optimized `customer_metrics.sql`**, not an obsolete version.
+
+---
+
+# 8. KPI DataFrame
+
+Implement retrieval of KPI data into a clean DataFrame/object suitable for the dashboard.
+
+At minimum expose:
+
+* total revenue
+* active customers
+* total transactions
+* AOV
+* repeat purchase rate
+* monthly revenue trend
+
+Ensure numeric values have sensible types.
+
+Do not turn monetary values into strings.
+
+---
+
+# 9. Customer metrics DataFrame
+
+Load the optimized customer metrics query.
+
+Ensure the resulting DataFrame contains the intended customer-level metrics.
+
+At minimum preserve:
+
+* customer_id
+* transaction count
+* total revenue
+* AOV
+* first purchase
+* last purchase
+* days since last purchase
+
+Do not unnecessarily recalculate these metrics in pandas.
+
+The database query remains the source of truth.
+
+---
+
+# 10. RFM DataFrame
+
+Load the SQL-derived RFM result.
+
+Preserve:
+
+* customer identifier
+* recency score
+* frequency score
+* monetary score
+* RFM segment
+
+Also provide a summary suitable for visualization:
+
+```text id="jvxxc8"
+segment
+customer_count
+total_revenue
+average_revenue
+```
+
+Do not replace SQL-derived RFM with a Python implementation.
+
+The RFM methodology established in Phase 3 remains authoritative.
+
+---
+
+# 11. Cohort DataFrame
+
+Load the cohort-retention result.
+
+Prepare it for eventual visualization.
+
+The resulting data should support a matrix/heatmap such as:
+
+```text id="fjzv6p"
+rows    = cohort month
+columns = months since first purchase
+values  = retention rate
+```
+
+Handle missing combinations appropriately.
+
+Do not invent retention values.
+
+---
+
+# 12. Category analytics DataFrame
+
+Load category-level analytical results.
+
+Preserve useful fields such as:
+
+* category
+* revenue
+* transaction count
+* AOV
+
+Sort/order data appropriately for dashboard consumption.
+
+Do not recalculate category revenue from the raw transactions in Python.
+
+---
+
+# 13. Revenue concentration DataFrame
+
+Load the revenue-concentration analysis.
+
+Prepare a clean dataset suitable for a chart such as:
+
+```text id="h6c9mp"
+Customer percentile
+Cumulative revenue share
+```
+
+or whatever structure the existing SQL produces.
+
+Do not alter the underlying methodology.
+
+---
+
+# 14. Top customers DataFrame
+
+Load the top-customer result.
+
+Prepare it for dashboard/table display.
+
+Preserve:
+
+* customer_id
+* total revenue
+* transaction count
+* AOV
+* last purchase date
+
+Do not expose unnecessary personal information.
+
+The dataset is synthetic, but maintain good analytical data practices.
+
+---
+
+# 15. Central analytics loader
+
+Create a simple top-level mechanism that can retrieve the dashboard datasets.
+
+Conceptually:
+
+```text id="iy1z0j"
+datasets = load_all_analytics()
+```
+
+returning named DataFrames or an equivalent clear structure.
+
+Do not create a complicated class hierarchy.
+
+The goal is easy Phase 6 integration.
+
+---
+
+# 16. Data validation
+
+Implement Python-side validation of the analytical datasets.
+
+This validation should complement, not replace, the PostgreSQL validation already performed in Phase 3.
+
+At minimum validate:
+
+### KPI consistency
+
+```text id="5r3i2r"
+total revenue == 53,581,128.12
+transactions == 245,210
+```
+
+Use actual database-derived values rather than hard-coding assumptions where practical.
+
+### Customer revenue conservation
+
+Sum of customer revenue should reconcile with total revenue.
+
+### Category revenue conservation
+
+Sum of category revenue should reconcile with total revenue.
+
+### RFM coverage
+
+RFM customer counts should cover all active customers.
+
+### Cohort integrity
+
+Retention counts/rates must be within logical bounds.
+
+### Concentration monotonicity
+
+Cumulative revenue share should not decrease as customer coverage increases.
+
+### Top-customer ordering
+
+Top customers should be ordered consistently by total revenue.
+
+---
+
+# 17. Avoid fragile hard-coded assertions
+
+Do not make the Python analytics layer depend unnecessarily on exact dataset values such as:
+
+```text id="1a3k1b"
+assert revenue == 53581128.12
+```
+
+unless the assertion is explicitly intended as a dataset integrity check.
+
+Prefer structural/invariant checks where possible.
+
+The Phase 1/2/3 dataset is deterministic, so exact values can be useful for regression validation, but the code should primarily validate analytical relationships.
+
+---
+
+# 18. Handle configuration cleanly
+
+The Python code should work from environment configuration.
+
+Do not expose:
+
+* passwords
+* connection strings with secrets
+* API keys
+
+in source code.
+
+Do not commit `.env`.
+
+Ensure `.env.example` remains accurate.
+
+If necessary, document the required variables in the README.
+
+---
+
+# 19. Data types and cleaning
+
+Ensure retrieved data has sensible Python/pandas types.
+
+Pay particular attention to:
+
+* timestamps
+* dates
+* numeric monetary fields
+* integer counts
+* percentages
+* nullable values
+
+Do not unnecessarily convert timestamps to strings.
+
+Do not round monetary values simply for display inside the analytical layer.
+
+Display formatting can happen later in the dashboard.
+
+---
+
+# 20. Dashboard-ready transformations
+
+Perform only lightweight transformations required for Phase 6.
+
+Examples:
+
+* pivot cohort data into a heatmap-friendly matrix
+* sort category data
+* calculate display labels
+* create ordered categorical values
+* reshape RFM summary
+* normalize column naming
+
+Do not build the Streamlit UI.
+
+Do not add dashboard-specific styling here.
+
+---
+
+# 21. Testing
+
+Create appropriate Python tests under `tests/`.
+
+Tests should verify:
+
+* PostgreSQL connection
+* SQL files can be loaded/executed
+* expected analytical datasets are returned
+* expected columns exist
+* numeric columns have valid types
+* key invariants hold
+* revenue reconciliation holds
+* customer/category totals reconcile
+* RFM coverage is complete
+* cohort values are valid
+* concentration is monotonic
+
+Do not test execution time with rigid thresholds.
+
+The Phase 4 benchmark is already responsible for performance measurement.
+
+---
+
+# 22. Reuse Phase 3 validation
+
+Where practical, avoid maintaining two completely different validation implementations.
+
+The Python tests should complement:
+
+```text
+tests/test_analytics.py
+```
+
+rather than duplicate every SQL-level check.
+
+Clearly separate:
+
+```text
+SQL/database correctness
+vs
+Python/data-interface correctness
+```
+
+---
+
+# 23. Error handling
+
+Handle expected failures cleanly.
+
+For example:
+
+* PostgreSQL connection failure
+* missing environment variable
+* missing SQL file
+* query execution error
+* unexpected columns
+* invalid DataFrame shape
+
+Do not catch every exception and silently continue.
+
+A dashboard should not display apparently valid but incomplete analytics because an underlying query failed.
+
+---
+
+# 24. Logging
+
+Use lightweight logging or clear exceptions where useful.
+
+Do not introduce a large logging framework.
+
+Useful information may include:
+
+* which dataset is being loaded
+* number of rows returned
+* query/file name
+* validation result
+
+Avoid logging secrets.
+
+---
+
+# 25. Performance considerations
+
+Do not benchmark the SQL again.
+
+However, ensure Python does not undo the Phase 4 optimization.
+
+For example:
+
+**Bad:**
+
+```text id="4e4g6g"
+SELECT *
+FROM transactions
+```
+
+followed by massive pandas aggregation.
+
+**Preferred:**
+
+```text id="r9k5m0"
+optimized SQL
+      ↓
+small analytical result
+      ↓
+pandas
+```
+
+This preserves the database's role in large-scale relational computation.
+
+---
+
+# 26. Validate actual output sizes
+
+After executing the Python analytics layer, record actual DataFrame sizes.
+
+For example:
+
+```text id="k8w6y7"
+KPI dataset:
+...
+
+Customer metrics:
+...
+
+RFM:
+...
+
+Cohorts:
+...
+
+Category:
+...
+
+Concentration:
+...
+
+Top customers:
+...
+```
+
+Do not invent expected sizes.
+
+Record actual values.
+
+---
+
+# 27. Phase 4 optimization preservation
+
+Explicitly verify that the optimized `customer_metrics.sql` remains in use.
+
+The Phase 4 performance improvement:
+
+```text id="8otn9s"
+~230 ms → ~139 ms
+```
+
+must not accidentally disappear because Python uses an older SQL version.
+
+Do not rerun the benchmark unless necessary for correctness.
+
+If the SQL file has changed since Phase 4, document why and ensure semantic equivalence.
+
+---
+
+# 28. Documentation
+
+Update:
+
+```text id="n0r3sm"
+project_state/STATE.md
+project_state/EVENTS.md
+project_state/METRICS.md
+project_state/phases/phase_05_analytics.md
+```
+
+Update `DECISIONS.md` only for meaningful architectural decisions.
+
+Document:
+
+* Python analytics architecture
+* SQL/Python responsibility split
+* datasets exposed to Phase 6
+* validation results
+* actual DataFrame sizes
+* configuration approach
+* problems/deviations
+* plan compliance
+
+---
+
+# 29. Events
+
+Record meaningful events using the project's existing event format.
+
+At minimum include events corresponding to:
+
+```text id="f6zvli"
+PHASE_STARTED
+PYTHON_ANALYTICS_LAYER_CREATED
+ANALYTICAL_DATASETS_LOADED
+PYTHON_VALIDATION_COMPLETED
+DASHBOARD_DATASETS_PREPARED
+PHASE_COMPLETED
+```
+
+Do not record events for operations that were not actually completed.
+
+---
+
+# 30. Metrics
+
+Record actual metrics in:
+
+```text id="2y0wgm"
+project_state/METRICS.md
+```
+
+Useful metrics include:
+
+* number of analytical datasets
+* rows returned per dataset
+* validation duration
+* Python processing duration where meaningful
+* revenue reconciliation
+* customer coverage
+* RFM coverage
+* cohort dimensions
+
+Do not fabricate timings.
+
+---
+
+# 31. Git hygiene
+
+Do not commit:
+
+* `.env`
+* secrets
+* PostgreSQL binaries
+* PostgreSQL data directory
+* generated CSVs
+* temporary DataFrame exports
+* unnecessary cache files
+
+Check:
+
+```text id="j4xq4x"
+git status
+```
+
+before completion.
+
+---
+
+# 32. Failure handling
+
+If PostgreSQL is unavailable:
+
+1. attempt to start the existing portable PostgreSQL instance
+2. verify the connection
+3. retry
+
+If still unavailable:
+
+```text
+Status: BLOCKED
+```
+
+Do not substitute CSVs/SQLite for production execution.
+
+If an analytical dataset fails validation:
+
+1. identify the cause
+2. fix the Python interface or SQL issue if appropriate
+3. rerun validation
+4. document the resolution
+
+Do not report PASS with known incorrect output.
+
+---
+
+# 33. Phase boundary
+
+When Phase 5 is complete:
+
+**STOP.**
+
+Do NOT automatically implement:
+
+* Streamlit
+* dashboard UI
+* deployment
+* cloud hosting
+* authentication
+
+Those belong to Phase 6/7.
+
+---
+
+# 34. Final completion report
+
+Return a compact evidence-based report:
+
+```text id="6ddj6c"
+PHASE REPORT
+
+Phase:
+PHASE_05_PYTHON_ANALYTICS
+
+Status:
+PASS / FAIL / BLOCKED
+
+Objective:
+
+Plan Compliance:
+PASS / PARTIAL / FAIL
+
+PostgreSQL:
+- Version:
+- Connection:
+- Database:
+
+Python Analytics Architecture:
+- ...
+
+SQL/Python Responsibility Split:
+- ...
+
+Datasets Implemented:
+- KPI:
+- Customer metrics:
+- RFM:
+- Cohorts:
+- Category:
+- Revenue concentration:
+- Top customers:
+
+Actual Dataset Sizes:
+- ...
+
+Validation:
+- PostgreSQL connection:
+- KPI consistency:
+- Customer revenue reconciliation:
+- Category revenue reconciliation:
+- RFM coverage:
+- Cohort integrity:
+- Concentration monotonicity:
+- Top-customer ordering:
+
+Phase 4 Optimization Preservation:
+- Optimized customer_metrics.sql confirmed:
+- ...
+
+Performance:
+- Python processing time:
+- Validation time:
+- Other measured timings:
+
+Tests:
+- ...
+
+Files Created/Modified:
+- ...
+
+Problems:
+- None / ...
+
+Decisions:
+- ...
+
+Current State:
+- ...
+
+Next Phase:
+PHASE_06_DASHBOARD
+
+Next Phase Resource Prompt:
+resources/prompts/PHASE_06_DASHBOARD.md
+
+Recommended Next Action:
+- ...
+
+Resume Instructions:
+STATE → IMPLEMENTATION_PLAN → PHASE_06 prompt → Phase 6 execution
+```
+
+Use actual measured values.
+
+# Final instruction
+
+Execute **PHASE_05_PYTHON_ANALYTICS only**.
+
+Use the real PostgreSQL analytical layer.
+
+Keep SQL as the source of truth for database-intensive analytics.
+
+Use Python/pandas for retrieval, validation, light transformation, and dashboard-ready data preparation.
+
+Do not duplicate the entire SQL analytics workload in pandas.
+
+Preserve the Phase 4 optimized customer metrics query.
+
+Actually execute and validate the Python layer.
+
+Update persistent state and logs.
+
+Do not build the Streamlit dashboard yet.
+
+When Phase 5 is genuinely complete—or genuinely blocked—return the completion report and **STOP**.

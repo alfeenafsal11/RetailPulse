@@ -1,0 +1,752 @@
+# RetailPulse — LIVE DEPLOYMENT EXECUTION
+
+## Phase
+
+PHASE_08_LIVE_DEPLOYMENT
+
+## Objective
+
+Deploy the completed RetailPulse project to a real public environment and obtain a **working public Streamlit URL** suitable for inclusion in the project's application/resume.
+
+This is a deployment-only phase.
+
+The RetailPulse implementation is already complete and locally validated. Do not redesign the application or add new functionality.
+
+The required final outcome is:
+
+```text
+Real hosted PostgreSQL
+        ↓
+Real Streamlit Community Cloud application
+        ↓
+Publicly accessible RetailPulse URL
+        ↓
+End-to-end validation
+```
+
+---
+
+# 1. REQUIRED CONTEXT RECOVERY
+
+Before doing anything, read:
+
+1. `project_state/STATE.md`
+2. `resources/IMPLEMENTATION_PLAN.md`
+3. `project_state/METRICS.md`
+4. `project_state/DECISIONS.md`
+5. `project_state/EVENTS.md`
+6. `project_state/phases/phase_07_deployment.md`
+7. `README.md`
+8. `AGENTS.md`
+
+Then inspect:
+
+* `database/schema.sql`
+* `database/seed.py`
+* `src/`
+* `sql/`
+* `app/`
+* `tests/`
+* `.env.example`
+* `.gitignore`
+
+Do not change analytical logic unless deployment reveals a genuine deployment-specific defect.
+
+---
+
+# 2. TARGET DEPLOYMENT ARCHITECTURE
+
+Use this target:
+
+```text
+GitHub
+  │
+  ▼
+Streamlit Community Cloud
+  │
+  │ HTTPS
+  ▼
+Hosted PostgreSQL
+  │
+  ├── customers
+  ├── products
+  └── transactions
+```
+
+The application must execute against the hosted PostgreSQL database in production.
+
+The production application must NOT depend on:
+
+* `localhost`
+* local PostgreSQL
+* `database/pg/`
+* local CSV files
+* local filesystem-generated data
+* developer-specific paths
+* `.env`
+
+---
+
+# 3. HOSTED POSTGRESQL
+
+Provision a legitimate managed PostgreSQL instance.
+
+Prefer a simple managed PostgreSQL provider appropriate for a small portfolio project.
+
+Do not introduce unnecessary infrastructure such as:
+
+* Kubernetes
+* Docker-based production orchestration
+* Spark
+* Kafka
+* Airflow
+* dbt
+* Redis
+* custom backend services
+
+A conventional managed PostgreSQL database is sufficient.
+
+If a provider is already available through the authenticated environment, use it.
+
+If no provider authentication is available, determine whether deployment can be completed through an existing authenticated browser/session.
+
+If authentication is required and unavailable, **STOP at that boundary and report the exact manual authentication action required from the user.**
+
+Do not fabricate credentials, database hosts, connection strings, provider resources, or deployment URLs.
+
+---
+
+# 4. PRODUCTION DATABASE MIGRATION
+
+Once legitimate hosted PostgreSQL access exists:
+
+### Schema
+
+Apply:
+
+```text
+database/schema.sql
+```
+
+to the hosted PostgreSQL instance.
+
+### Data
+
+Generate/load the deterministic RetailPulse dataset using the established project process.
+
+Preserve:
+
+```text
+seed = 42
+```
+
+Do not create a different production dataset merely to make deployment easier.
+
+Expected authoritative dataset:
+
+```text
+Customers:    10,000
+Products:        500
+Transactions: 245,210
+Revenue:       $53,581,128.12
+Date range:   2024-07-01 to 2026-06-30
+```
+
+Verify the actual database values rather than blindly assuming these values.
+
+---
+
+# 5. PRODUCTION DATABASE VALIDATION
+
+Run validation directly against the hosted PostgreSQL database.
+
+Verify:
+
+### Row counts
+
+```text
+customers    = 10,000
+products     = 500
+transactions = 245,210
+```
+
+### Revenue
+
+```text
+$53,581,128.12
+```
+
+### Integrity
+
+Verify:
+
+* primary-key uniqueness
+* foreign-key integrity
+* transaction/customer relationships
+* transaction/product relationships
+* quantity validity
+* price validity
+* discount validity
+* amount calculation consistency
+
+### Timestamp range
+
+Verify:
+
+```text
+MIN(transaction_timestamp)
+MAX(transaction_timestamp)
+```
+
+and reconcile it against the authoritative local dataset.
+
+### Analytical reconciliation
+
+Execute the existing analytical SQL against the hosted database.
+
+Verify at minimum:
+
+* total revenue
+* transaction count
+* active customers
+* AOV
+* repeat purchase rate
+* RFM population
+* category revenue
+* revenue concentration
+* cohort output
+* top customer output
+
+Production analytical results must match the validated local results.
+
+If any discrepancy exists:
+
+1. Diagnose it.
+2. Determine whether it is a migration/data/configuration issue.
+3. Fix the issue.
+4. Rerun validation.
+
+Do not silently accept unexplained discrepancies.
+
+---
+
+# 6. DATABASE CONNECTION SECURITY
+
+Production credentials must NEVER be committed to Git.
+
+Use Streamlit's supported secrets mechanism for the deployed application.
+
+The repository may contain:
+
+```text
+.env.example
+```
+
+with placeholders only.
+
+The repository must NOT contain:
+
+* database password
+* database connection URI containing credentials
+* cloud API keys
+* provider tokens
+* OAuth tokens
+* Streamlit secrets
+* private keys
+
+Production configuration must be separate from local development configuration.
+
+Conceptually:
+
+```text
+Local:
+.env
+    ↓
+local PostgreSQL
+
+Production:
+Streamlit Secrets
+    ↓
+hosted PostgreSQL
+```
+
+Do not commit either secret store.
+
+---
+
+# 7. STREAMLIT COMMUNITY CLOUD
+
+Deploy the existing Streamlit application through Streamlit Community Cloud.
+
+Use the existing application entry point:
+
+```text
+app/app.py
+```
+
+Do not create a second dashboard implementation.
+
+Do not migrate the application to another framework.
+
+The deployed application must use the hosted PostgreSQL connection.
+
+It must not attempt:
+
+```text
+localhost:5432
+```
+
+in production.
+
+---
+
+# 8. PRODUCTION CONFIGURATION
+
+Inspect the existing database connection code.
+
+Ensure production configuration can correctly resolve:
+
+* host
+* port
+* database
+* username
+* password
+* SSL configuration if required by the provider
+
+The application should preserve local development support while allowing Streamlit production secrets.
+
+Do not hard-code provider-specific credentials into source code.
+
+If necessary, implement a minimal environment/secrets abstraction such as:
+
+```text
+Production:
+Streamlit secrets/environment variables
+
+Local:
+.env
+```
+
+Do not introduce a new configuration framework.
+
+---
+
+# 9. DEPLOYMENT SMOKE TEST
+
+After deployment, obtain the actual public Streamlit URL.
+
+Open the URL from a clean/non-local context.
+
+Verify:
+
+### Application availability
+
+* URL resolves
+* Streamlit application loads
+* no startup exception
+* no database connection exception
+
+### KPI section
+
+Verify the application displays the validated values, including approximately:
+
+```text
+Revenue: $53.58M
+Transactions: 245,210
+Customers: 10,000
+AOV: approximately $218.51
+```
+
+Use the actual rendered values from the application.
+
+### Visualizations
+
+Verify:
+
+* monthly revenue trend
+* category revenue chart
+* RFM visualization
+* cohort heatmap
+* revenue concentration
+* top customers
+* customer explorer
+
+### Interactivity
+
+Verify the customer explorer functions correctly.
+
+### Error handling
+
+Verify that no raw credentials, connection strings, stack traces containing secrets, or sensitive configuration are exposed to users.
+
+---
+
+# 10. PUBLIC URL REQUIREMENT
+
+The central success criterion for this phase is:
+
+```text
+A real public URL that loads RetailPulse successfully.
+```
+
+The final report MUST include:
+
+```text
+Public URL:
+<actual verified URL>
+```
+
+Do not use:
+
+```text
+N/A
+```
+
+if deployment has actually succeeded.
+
+Do not invent a URL based on repository naming conventions.
+
+Only report the URL after verifying that it resolves and the application loads.
+
+---
+
+# 11. DEPLOYMENT FAILURE RULE
+
+There are two acceptable outcomes.
+
+### Outcome A — Deployment succeeds
+
+Continue through full validation and return:
+
+```text
+Status: PASS
+Public URL: <verified URL>
+```
+
+### Outcome B — External authentication/infrastructure blocks deployment
+
+Do NOT fabricate success.
+
+Return:
+
+```text
+Status: BLOCKED
+Blocker: <exact external dependency>
+Required user action: <exact action>
+```
+
+For example, if Streamlit Cloud requires an authenticated browser session unavailable to the execution environment, explicitly state that.
+
+Do not claim that the application is publicly deployed merely because the repository is ready.
+
+---
+
+# 12. README UPDATE
+
+If deployment succeeds, update `README.md` with:
+
+## Live Demo
+
+Include the verified public Streamlit URL.
+
+Clearly distinguish:
+
+```text
+Live Demo
+Production deployment
+```
+
+from local setup instructions.
+
+Document:
+
+* hosted PostgreSQL
+* Streamlit Community Cloud
+* production secrets configuration concept
+* deployment architecture
+* public application URL
+
+Do not expose credentials.
+
+If deployment fails, retain accurate deployment-blocker documentation instead.
+
+---
+
+# 13. PROJECT STATE UPDATE
+
+If deployment succeeds, update:
+
+### `STATE.md`
+
+Mark:
+
+```text
+Local implementation: COMPLETE
+Hosted PostgreSQL: COMPLETE
+Streamlit deployment: COMPLETE
+Public URL: VERIFIED
+End-to-end validation: PASS
+```
+
+### `METRICS.md`
+
+Add production validation metrics.
+
+Clearly distinguish:
+
+```text
+Local Phase 4 performance benchmark
+```
+
+from any production deployment measurements.
+
+If no production benchmark is performed, say so.
+
+Do not transform the historical ~39% local optimization result into a production benchmark.
+
+### `EVENTS.md`
+
+Append the deployment event.
+
+Include:
+
+* hosted database provisioned
+* data migrated
+* production validation
+* Streamlit deployment
+* public URL verification
+
+### `DECISIONS.md`
+
+Record any legitimate deployment-specific decisions.
+
+### `phase_08_live_deployment.md`
+
+Create/update the phase execution record.
+
+---
+
+# 14. FINAL SECURITY AUDIT
+
+After deployment, inspect the Git repository again.
+
+Run:
+
+```text id="m8dbau"
+git status
+git ls-files
+```
+
+Verify no credentials or secrets were committed during deployment.
+
+Check:
+
+* `.env`
+* `.gitignore`
+* source files
+* README
+* project-state files
+* deployment configuration
+
+No secrets should appear anywhere in tracked files.
+
+---
+
+# 15. FINAL TEST SUITE
+
+Run:
+
+```text id="dy3q2l"
+tests/test_data.py
+tests/test_reproducibility.py
+tests/test_analytics.py
+tests/test_python_analytics.py
+```
+
+Then run the production deployment smoke test.
+
+Do not mark deployment PASS if the application URL exists but cannot connect to the hosted database.
+
+The complete success condition is:
+
+```text
+Public URL
++
+Application loads
++
+Hosted PostgreSQL connection works
++
+Analytical SQL works
++
+Dashboard renders
++
+No secret exposure
+```
+
+---
+
+# 16. IMPORTANT PERFORMANCE CLAIM
+
+Preserve the established Phase 4 benchmark:
+
+```text
+Baseline:  ~230 ms
+Optimized: ~139 ms
+Improvement: ~39%
+```
+
+This remains a benchmark of the local PostgreSQL workload/query rewrite.
+
+If a production benchmark is performed, record it separately.
+
+Never write:
+
+> RetailPulse queries are 39% faster in production.
+
+Instead write:
+
+> The customer metrics query was optimized from approximately 230 ms to 139 ms on the local PostgreSQL benchmark workload, a ~39% reduction. Production performance was not inferred from this result.
+
+---
+
+# 17. DO NOT CHANGE THE PROJECT'S SCOPE
+
+Do not add:
+
+* LLMs
+* AI agents
+* ML churn models
+* recommendation systems
+* LangChain
+* LangGraph
+* Spark
+* Kafka
+* Airflow
+* dbt
+* React
+* FastAPI
+* Redis
+* Kubernetes
+* authentication systems
+* custom APIs
+
+The objective is deployment of the existing analytics-engineering project.
+
+---
+
+# 18. FINAL REPORT
+
+Return exactly:
+
+```text id="e9d2bx"
+PHASE REPORT
+
+Phase:
+PHASE_08_LIVE_DEPLOYMENT
+
+Status:
+PASS / BLOCKED
+
+Hosted PostgreSQL:
+- Provider:
+- Version:
+- Host:
+- Database:
+- Status:
+
+Production Dataset:
+- Customers:
+- Products:
+- Transactions:
+- Revenue:
+- Date range:
+
+Production Validation:
+- Row counts:
+- PK integrity:
+- FK integrity:
+- Monetary consistency:
+- Revenue reconciliation:
+- Analytics reconciliation:
+
+Streamlit:
+- Platform:
+- Entry point:
+- Startup:
+- Database connectivity:
+- KPI rendering:
+- Revenue trend:
+- Category chart:
+- RFM:
+- Cohort heatmap:
+- Revenue concentration:
+- Top customers:
+- Customer explorer:
+
+Public URL:
+<verified URL or N/A>
+
+Security:
+- Secrets committed:
+- Production credentials exposed:
+- Repository audit:
+
+Tests:
+- test_data.py:
+- test_reproducibility.py:
+- test_analytics.py:
+- test_python_analytics.py:
+- Production smoke test:
+
+Performance:
+- Historical local baseline:
+- Historical local optimized:
+- Historical local improvement:
+- Production benchmark:
+
+Documentation:
+- README:
+- STATE:
+- METRICS:
+- EVENTS:
+- DECISIONS:
+- Phase file:
+
+Problems:
+...
+
+Required Manual Action:
+...
+
+Final Deployment State:
+...
+
+Recommended Next Action:
+...
+```
+
+---
+
+# STOPPING RULE
+
+If deployment succeeds and the public URL is verified:
+
+**STOP.**
+
+Do not add additional features.
+
+Do not redesign the architecture.
+
+Do not create another development phase.
+
+The project is then complete.
+
+If deployment is blocked by authentication:
+
+**STOP immediately at the authentication boundary.**
+
+Do not simulate deployment.
+
+Do not fabricate a public URL.
+
+Report the exact action the user must perform to provide legitimate authenticated access, then stop.

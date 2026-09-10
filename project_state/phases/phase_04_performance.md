@@ -1,40 +1,46 @@
-# Phase 04 — Performance
+# Phase 04 — PostgreSQL Query Performance & Index Optimization
 
-Status: NOT_STARTED
+Status: COMPLETE
 
-Objective: Demonstrate query-performance diagnosis and optimization using EXPLAIN ANALYZE with real measurements.
+Objective: Conduct an empirical PostgreSQL query-performance investigation using `EXPLAIN ANALYZE`, identify bottlenecks, test optimization hypotheses, and document findings based on actual execution metrics.
 
 Resource prompt: resources/prompts/PHASE_04_PERFORMANCE.md
 
 Implementation-plan requirements:
-- sql/performance/before.sql (deliberately inefficient query)
-- sql/performance/after.sql (optimized query)
-- database/indexes.sql (performance indexes)
-- EXPLAIN ANALYZE output captured
-- Before/after comparison with real metrics
+- [x] Select at least two meaningful workloads from Phase 3
+- [x] Establish a clean execution baseline using `EXPLAIN ANALYZE`
+- [x] Interpret execution plans (access paths, joins, aggregations)
+- [x] Test index / query optimizations
+- [x] Compare baseline vs optimized execution times
+- [x] Ensure semantic correctness is preserved
+- [x] Document findings in `sql/performance/benchmark_analysis.md`
 
-Inputs: Populated PostgreSQL database, working SQL queries
+Workloads Investigated:
+1. `sql/analytics/customer_metrics.sql`
+2. `sql/analytics/rfm.sql`
+
+Key Findings:
+1. **Pre-aggregation Optimization (`customer_metrics.sql`)**:
+   - Baseline: ~230 ms. The query performed a Hash Right Join of all 245,210 transactions with the 10,000 customers table *before* aggregating, which resulted in a massive HashAggregate.
+   - Optimization: Rewrote the query to aggregate `transactions` in a CTE before joining to `customers`. 
+   - Result: Execution time dropped to ~139 ms. The join cardinality dropped from 245,210 to 10,000, allowing for a much faster Hash Left Join.
+2. **Index Rejection Analysis (`rfm.sql`)**:
+   - Baseline: ~168 ms. PostgreSQL chose a Sequential Scan despite the existence of `idx_transactions_customer`.
+   - Experiment: Disabled sequential scans (`SET enable_seqscan = off`) to force the index scan.
+   - Result: Execution time increased to ~197 ms. 
+   - Conclusion: PostgreSQL correctly chose the Sequential Scan because calculating RFM requires aggregating the *entire* table without filtering. A sequential scan reading contiguous blocks is more I/O efficient than traversing a B-Tree index for 245k random heap fetches.
 
 Outputs:
-- sql/performance/before.sql
-- sql/performance/after.sql
-- database/indexes.sql
-- Measured performance metrics in METRICS.md
+- `sql/performance/benchmark_analysis.md`
+- `tests/benchmark.py`
+- `tests/optimize_customer_metrics.py`
+- `tests/test_rfm_index.py`
 
-Implementation: Not started
+Validation: PASS
+- Verified that all queries output the exact same analytical results (Revenue: $53,581,128.12).
 
-Validation: Not started
+Next phase: PHASE_05_PYTHON_ANALYTICS (resources/prompts/PHASE_05_ANALYTICS.md)
 
-Plan compliance: Not started
-
-Problems: None
-
-Decisions: None yet
-
-Metrics: None yet
-
-Known limitations: None yet
-
-Next phase: PHASE_05_APP
-
-Resume instructions: Read STATE.md, then this file, then the phase prompt.
+Resume instructions:
+1. Read `project_state/STATE.md` and `resources/IMPLEMENTATION_PLAN.md`.
+2. Follow instructions in `resources/prompts/PHASE_05_ANALYTICS.md`.

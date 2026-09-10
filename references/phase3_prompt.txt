@@ -1,0 +1,920 @@
+You are executing **exactly one project phase** in the RetailPulse project.
+
+# PHASE 3 — ANALYTICAL SQL & BUSINESS INSIGHTS
+
+## 1. Read project context before doing anything
+
+Read these files in this order:
+
+1. `project_state/STATE.md`
+2. `resources/IMPLEMENTATION_PLAN.md`
+3. `resources/prompts/PHASE_03_ANALYTICS.md`
+4. `project_state/phases/phase_03_analytics.md`
+5. `project_state/DECISIONS.md`
+6. `AGENTS.md`
+
+Then inspect the Phase 2 database implementation:
+
+* `database/schema.sql`
+* `database/seed.py`
+* `data/raw/*.csv`
+* `src/data_generator.py`
+
+Verify that Phase 2 is actually PASS before beginning.
+
+Also verify that the local PostgreSQL instance is available.
+
+The project currently uses:
+
+```text
+PostgreSQL 16.4
+localhost:5432
+database: postgres
+```
+
+If PostgreSQL is not running, start the existing portable/user-space PostgreSQL instance using the project's established mechanism. Do not reinstall PostgreSQL or change the database architecture unnecessarily.
+
+---
+
+# 2. Phase objective
+
+Build the **core analytical SQL layer** for RetailPulse.
+
+The objective is to answer realistic retail/customer-business questions using PostgreSQL rather than merely demonstrating isolated SQL syntax.
+
+The analytics must support the project's central business question:
+
+> Which customers, products, and customer segments are driving revenue and retention, and which customers should a retail engagement platform prioritize for intervention?
+
+The resulting SQL should demonstrate practical competence in:
+
+* SELECT/filtering
+* aggregations
+* GROUP BY
+* JOINs
+* date/time analysis
+* CTEs
+* window functions
+* conditional aggregation
+* customer-level metrics
+* segmentation
+* cohort analysis
+* revenue concentration
+* business-oriented interpretation
+
+This phase must produce **reusable SQL artifacts**, not merely one-off commands executed interactively.
+
+---
+
+# 3. Important scope boundary
+
+This phase is analytical SQL only.
+
+Do NOT implement:
+
+* Streamlit
+* Python analytics pipelines
+* dashboard UI
+* cloud deployment
+* LLM/agent functionality
+* FastAPI
+* React
+* Spark
+* Kafka
+* Airflow
+* dbt
+* Phase 4 performance experiments
+
+Do not turn this into a general data-engineering project.
+
+The SQL layer is the primary deliverable.
+
+---
+
+# 4. Preserve the database architecture
+
+Use the existing Phase 2 tables:
+
+```text
+customers
+products
+transactions
+```
+
+Do not redesign the schema unless an actual defect prevents the required analytics.
+
+If the existing schema is sufficient, leave it unchanged.
+
+If a schema issue genuinely needs correction:
+
+1. identify the problem
+2. determine whether it is a Phase 2 defect or a Phase 3 requirement
+3. make the smallest justified change
+4. document the change in `DECISIONS.md`
+5. update state accordingly
+6. rerun relevant validation
+
+Do not silently redesign the database.
+
+---
+
+# 5. Establish analytical SQL organization
+
+Inspect the existing `sql/` structure and organize the analytical queries cleanly.
+
+Use meaningful files/categories, for example conceptually:
+
+```text
+sql/
+    analytics/
+        kpis.sql
+        customer_metrics.sql
+        rfm.sql
+        cohorts.sql
+        revenue_concentration.sql
+        category_analysis.sql
+```
+
+Follow the existing implementation plan and repository conventions if they specify different names.
+
+Do not create unnecessary files.
+
+Each SQL artifact should have a clear purpose and preferably begin with a concise comment describing the business question it answers.
+
+---
+
+# 6. KPI analytics
+
+Create queries for core retail KPIs.
+
+At minimum calculate:
+
+### Revenue
+
+```text
+total revenue
+```
+
+### Customers
+
+```text
+total customers
+active customers
+```
+
+Define "active customer" explicitly rather than assuming the term has an obvious meaning.
+
+### Transactions
+
+```text
+total transactions
+```
+
+### Average Order Value
+
+Conceptually:
+
+```text
+total revenue / total transactions
+```
+
+### Repeat purchase rate
+
+Define and calculate a defensible repeat-purchase metric.
+
+For example:
+
+```text
+customers with >1 transaction
+--------------------------------
+customers with >=1 transaction
+```
+
+Document the definition.
+
+### Time-series revenue
+
+Calculate revenue by:
+
+* month
+* optionally week/day where useful
+
+Use actual transaction timestamps.
+
+Do not assume the nominal generator end date.
+
+---
+
+# 7. Customer-level analytics
+
+Create a reusable customer-level analytical query or CTE containing metrics such as:
+
+```text
+customer_id
+transaction_count
+total_revenue
+average_order_value
+first_purchase_date
+last_purchase_date
+days_since_last_purchase
+purchase_frequency
+```
+
+Use appropriate joins and aggregations.
+
+This customer-level analytical layer should become the foundation for RFM analysis.
+
+Avoid duplicating the same customer aggregation logic across many unrelated queries if a reusable CTE/query structure can make the implementation clearer.
+
+---
+
+# 8. RFM segmentation
+
+Implement **actual RFM analysis in SQL**.
+
+Do not use:
+
+```text
+customer_segment_ground_truth
+```
+
+to determine RFM segments.
+
+That field is generation-time ground truth only.
+
+RFM must be independently derived from observed transactions.
+
+Calculate:
+
+### Recency
+
+Time since the customer's latest purchase.
+
+### Frequency
+
+Number of transactions/orders.
+
+### Monetary
+
+Total customer revenue.
+
+Choose defensible scoring logic.
+
+A practical implementation may use PostgreSQL window functions such as:
+
+```text
+NTILE(5)
+```
+
+to generate 1–5 scores.
+
+Document:
+
+* recency scoring direction
+* frequency scoring direction
+* monetary scoring direction
+* how the final segment is assigned
+
+For example, higher recency quality should correspond to more recent activity.
+
+Do not hard-code arbitrary customer IDs into segments.
+
+---
+
+# 9. Customer segment definitions
+
+Create business-readable RFM segments.
+
+At minimum consider segments such as:
+
+```text
+Champions
+Loyal
+New
+At Risk
+Lost
+```
+
+The exact threshold logic should be justified and documented.
+
+Important:
+
+The synthetic generator already contains five behavioral archetypes. The SQL segmentation must remain independent.
+
+After calculating SQL-derived RFM segments, compare them against `customer_segment_ground_truth` only as an **analytical validation/exploration**, not as the segmentation mechanism.
+
+If you perform this comparison, clearly label it as a comparison between:
+
+```text
+latent generation archetype
+        vs
+observed RFM-derived segment
+```
+
+Do not claim that they should match perfectly.
+
+---
+
+# 10. RFM output
+
+Produce a query that summarizes:
+
+* number of customers by RFM segment
+* revenue by RFM segment
+* average revenue/customer by segment
+* transaction count by segment
+* optionally average recency/frequency/monetary values
+
+This should answer a business question such as:
+
+> Which customer groups are most valuable, and which groups may require re-engagement?
+
+The query should be directly usable by the later Python/dashboard phase.
+
+---
+
+# 11. Cohort retention analysis
+
+Implement a SQL cohort analysis.
+
+Use:
+
+```text
+customer signup date
+```
+
+and/or first purchase date according to the implementation plan.
+
+Be explicit about the cohort definition.
+
+A strong default is:
+
+> Customer cohort = month of first observed purchase.
+
+Then calculate retention by cohort and elapsed month.
+
+Conceptually:
+
+```text
+cohort_month
+months_since_first_purchase
+cohort_size
+retained_customers
+retention_rate
+```
+
+Produce a result that can naturally become a retention heatmap in Phase 5/6.
+
+Use actual dates from the database.
+
+Avoid creating an unnecessarily complicated cohort model.
+
+---
+
+# 12. Revenue by category
+
+Join:
+
+```text
+transactions
+        ↓
+products
+```
+
+and calculate:
+
+* revenue by category
+* transaction count by category
+* units sold by category
+* average transaction value by category where meaningful
+
+Rank categories by revenue.
+
+This demonstrates practical join and aggregation skills.
+
+---
+
+# 13. Revenue concentration
+
+Implement revenue concentration analysis.
+
+At minimum calculate the share of total revenue contributed by:
+
+```text
+Top 1%
+Top 5%
+Top 10%
+Top 20%
+```
+
+of customers, or use the implementation plan's specified concentration thresholds if different.
+
+Use window functions where appropriate.
+
+Do not simply sort customers and manually inspect the result.
+
+The SQL should calculate cumulative revenue and cumulative revenue percentage.
+
+This is important because it creates a realistic business insight:
+
+> How dependent is revenue on a small fraction of customers?
+
+---
+
+# 14. Top customers
+
+Create a query identifying the highest-value customers.
+
+Include at least:
+
+```text
+customer_id
+total_revenue
+transaction_count
+average_order_value
+last_purchase_date
+```
+
+Limit the output appropriately, e.g. top 20 or top 50.
+
+Do not expose unnecessary customer attributes.
+
+---
+
+# 15. Business-question framing
+
+Every major analytical SQL file should answer a recognizable business question.
+
+Examples:
+
+```text
+KPI:
+How is the retail business performing?
+
+Customer metrics:
+Who are the highest-value customers?
+
+RFM:
+Which customers are Champions, Loyal, At Risk, or Lost?
+
+Cohorts:
+How well are newly acquired customers being retained?
+
+Categories:
+Which product categories drive revenue?
+
+Concentration:
+How dependent is revenue on the highest-value customers?
+```
+
+This is deliberate.
+
+The Xeno role requires translating ambiguous business problems into data questions, not merely writing syntactically correct SQL.
+
+Document the business question above each major query.
+
+---
+
+# 16. SQL quality requirements
+
+Write production-style SQL where practical.
+
+Use:
+
+* meaningful aliases
+* consistent formatting
+* explicit joins
+* CTEs when they improve readability
+* window functions where analytically appropriate
+* comments for non-obvious business logic
+
+Avoid:
+
+* `SELECT *` in reusable analytical outputs unless genuinely appropriate
+* deeply nested unreadable queries
+* duplicated logic
+* arbitrary magic numbers without comments
+* unnecessary subqueries
+* accidental Cartesian joins
+
+Do not optimize queries prematurely in this phase.
+
+Phase 4 is specifically dedicated to performance diagnosis and optimization.
+
+---
+
+# 17. Validate every analytical query
+
+Every major analytical query must actually be executed against PostgreSQL.
+
+Do not validate SQL by syntax inspection alone.
+
+For each query verify:
+
+* it executes successfully
+* returned columns are correct
+* row counts are reasonable
+* values are internally consistent
+* joins do not unexpectedly multiply rows
+* calculations produce plausible results
+
+Record actual outputs or summary results where useful.
+
+Do not fabricate analytical findings.
+
+---
+
+# 18. Cross-check important metrics
+
+Where possible, independently verify important calculations.
+
+For example:
+
+```text
+total revenue from KPI query
+        =
+total revenue from direct transactions aggregation
+```
+
+Likewise verify:
+
+```text
+customer-level revenue sum
+        =
+overall revenue
+```
+
+and:
+
+```text
+category revenue sum
+        ≈
+overall revenue
+```
+
+according to the chosen treatment of all transaction records.
+
+Investigate any discrepancy.
+
+This is especially important for detecting accidental row multiplication during joins.
+
+---
+
+# 19. Validate joins explicitly
+
+Because JOIN performance and correctness are central to the project, perform sanity checks for the major joins.
+
+For example:
+
+```text
+transactions
+JOIN customers
+```
+
+should not increase the number of transaction rows.
+
+Likewise:
+
+```text
+transactions
+JOIN products
+```
+
+should not increase the number of transaction rows.
+
+Validate this explicitly.
+
+If a join unexpectedly multiplies rows, investigate and correct the SQL.
+
+---
+
+# 20. Analytical tests
+
+Create an appropriate test/validation mechanism under `tests/` for the SQL analytics.
+
+The tests should validate important invariants rather than merely checking that files exist.
+
+Examples:
+
+### Revenue conservation
+
+Sum of category revenue should reconcile with total revenue.
+
+### Customer revenue conservation
+
+Sum of customer-level revenue should reconcile with total revenue.
+
+### RFM assignment
+
+Each eligible customer should receive exactly one RFM segment.
+
+### Cohort consistency
+
+Retained customers cannot exceed the cohort population for the relevant cohort/month.
+
+### Revenue concentration
+
+Cumulative revenue percentage should be monotonic.
+
+### Transaction join integrity
+
+Joining transactions with dimensions should preserve transaction row count.
+
+Use actual PostgreSQL execution.
+
+---
+
+# 21. Important distinction: analytics vs performance
+
+Do NOT turn this phase into the query-performance experiment.
+
+You may observe that some queries are slow, but do not start a full optimization experiment.
+
+Do not create:
+
+```text
+baseline benchmark
+EXPLAIN ANALYZE comparison
+index-removal experiment
+optimized benchmark
+```
+
+as a Phase 3 deliverable.
+
+That belongs to Phase 4.
+
+However, if you notice a query that is naturally useful for Phase 4, document it as a candidate workload.
+
+For example:
+
+```text
+PHASE_4_CANDIDATE:
+customer revenue aggregation
+```
+
+This will help establish a realistic performance experiment later.
+
+---
+
+# 22. Candidate workload identification for Phase 4
+
+Identify 2–3 analytical queries that are good candidates for future performance analysis.
+
+Candidates should involve meaningful workload characteristics such as:
+
+* large transaction-table scan
+* customer aggregation
+* joins
+* timestamp filtering
+* grouping
+* sorting/window functions
+
+Record the candidate queries and why they are useful.
+
+Do not benchmark or optimize them yet.
+
+---
+
+# 23. Documentation
+
+Update:
+
+```text
+project_state/STATE.md
+project_state/EVENTS.md
+project_state/METRICS.md
+project_state/phases/phase_03_analytics.md
+```
+
+Update `DECISIONS.md` only if a meaningful analytical design decision is made.
+
+Record:
+
+* analytical SQL files created
+* query categories
+* definitions of KPIs
+* RFM methodology
+* cohort methodology
+* revenue concentration methodology
+* actual validation results
+* candidate Phase 4 performance workloads
+* problems
+* deviations
+* plan compliance
+
+Do not put large query outputs into state files.
+
+Record concise, useful summaries and actual metrics.
+
+---
+
+# 24. Events
+
+Record meaningful events using the existing event format.
+
+At minimum include events corresponding to:
+
+```text
+PHASE_STARTED
+ANALYTICAL_SQL_CREATED
+RFM_ANALYSIS_COMPLETED
+COHORT_ANALYSIS_COMPLETED
+REVENUE_ANALYSIS_COMPLETED
+ANALYTICAL_VALIDATION_COMPLETED
+PHASE_COMPLETED
+```
+
+If a meaningful issue occurs, record it.
+
+---
+
+# 25. Metrics
+
+Record actual analytical metrics in `project_state/METRICS.md`.
+
+Useful values include:
+
+* total revenue
+* total transactions
+* active customers
+* repeat purchase rate
+* AOV
+* number of RFM segments/customers
+* revenue by RFM segment
+* cohort counts/retention summary
+* top category by revenue
+* top-customer concentration
+* query execution observations if relevant
+
+These values must come from actual PostgreSQL execution.
+
+Do not invent values.
+
+---
+
+# 26. Git hygiene
+
+Do not commit:
+
+* generated CSVs
+* PostgreSQL binaries
+* PostgreSQL data directory
+* secrets
+* `.env`
+* temporary query outputs
+
+The existing `.gitignore` and ADR-007/ADR-008 decisions remain in effect.
+
+Check `git status` before finishing.
+
+---
+
+# 27. Failure handling
+
+If an analytical query fails:
+
+1. diagnose the SQL/database issue
+2. fix it
+3. rerun it
+4. validate the result
+5. document the issue if meaningful
+
+If PostgreSQL is unavailable:
+
+* attempt to start the existing portable PostgreSQL instance
+* do not substitute another database
+* if it cannot be started, report BLOCKED
+
+Do not fabricate query results.
+
+---
+
+# 28. Phase boundary
+
+When Phase 3 is complete:
+
+**STOP.**
+
+Do NOT automatically proceed to:
+
+* Phase 4 performance optimization
+* Python analytics
+* Streamlit
+* deployment
+
+Phase 4 will be separately authorized.
+
+---
+
+# 29. Final completion report
+
+Return a compact evidence-based report:
+
+```text
+PHASE REPORT
+
+Phase:
+PHASE_03_ANALYTICS
+
+Status:
+PASS / FAIL / BLOCKED
+
+Objective:
+
+Plan Compliance:
+PASS / PARTIAL / FAIL
+
+PostgreSQL:
+- Version:
+- Connection:
+- Database:
+
+Analytical SQL:
+- Files created:
+- KPI analytics:
+- Customer analytics:
+- RFM:
+- Cohort retention:
+- Category analysis:
+- Revenue concentration:
+- Top customers:
+
+Key Definitions:
+- Active customer:
+- Repeat purchase:
+- RFM methodology:
+- Cohort definition:
+- Revenue concentration definition:
+
+Actual Results:
+- Total revenue:
+- Total transactions:
+- Active customers:
+- AOV:
+- Repeat purchase rate:
+- Other important findings:
+
+Validation:
+- Revenue reconciliation:
+- Customer revenue reconciliation:
+- Category revenue reconciliation:
+- Join integrity:
+- RFM integrity:
+- Cohort integrity:
+- Concentration integrity:
+
+Tests:
+- ...
+
+Phase 4 Candidate Workloads:
+- Query 1:
+- Query 2:
+- Query 3:
+
+Performance:
+- Not benchmarked / observations only
+
+Files Created/Modified:
+- ...
+
+Problems:
+- None / ...
+
+Decisions:
+- ...
+
+Current State:
+- ...
+
+Next Phase:
+PHASE_04_PERFORMANCE
+
+Next Phase Resource Prompt:
+resources/prompts/PHASE_04_PERFORMANCE.md
+
+Recommended Next Action:
+- ...
+
+Resume Instructions:
+STATE → IMPLEMENTATION_PLAN → PHASE_04 prompt → Phase 4 execution
+```
+
+Use actual values rather than planned values.
+
+# Final instruction
+
+Execute **PHASE_03_ANALYTICS only**.
+
+Use the real PostgreSQL database created in Phase 2.
+
+Build and execute the analytical SQL layer.
+
+Validate the analytical results and important invariants.
+
+Maintain the distinction between generated ground-truth archetypes and independently derived RFM segments.
+
+Do not perform the Phase 4 performance experiment yet.
+
+Update persistent project state and logs.
+
+When Phase 3 is genuinely complete, return the completion report and **STOP**.
