@@ -1,42 +1,34 @@
 # Project State
 
 ## Current Phase
-PHASE_00_BOOTSTRAP
+PHASE_01_DATA
 
 ## Status
 COMPLETE
 
 ## Objective
-Initialize project structure, resource-plan files, and persistent agent-state system.
+Generate reproducible synthetic retail transaction dataset with behavioral customer archetypes.
 
 ## Implementation Plan
 resources/IMPLEMENTATION_PLAN.md
 
 ## Current Resource Prompt
-resources/prompts/PHASE_00_BOOTSTRAP.md
+resources/prompts/PHASE_01_DATA.md
 
 ## Completed
-- Git repository initialized
-- Directory structure created (data/, database/, sql/, src/, app/, tests/, resources/, project_state/)
-- .gitignore created
-- README.md created with project objective and architecture
-- AGENTS.md created with agent operating rules
-- requirements.txt created with minimal dependencies
-- resources/IMPLEMENTATION_PLAN.md created (covers PHASE 0–7)
-- resources/INITIAL_PROMPT.md created
-- All 8 phase prompts created in resources/prompts/
-- project_state/STATE.md created
-- project_state/EVENTS.md created
-- project_state/DECISIONS.md created (ADR-001 through ADR-006)
-- project_state/METRICS.md created
-- All 8 phase tracking files created
-- Phase 0 validation passed
+- Phase 0: Bootstrap (COMPLETE)
+- Phase 1: Data generation (COMPLETE)
+  - src/data_generator.py implemented with 5 behavioral archetypes
+  - tests/test_data.py — 50/50 validation checks PASS
+  - tests/test_reproducibility.py — MD5 hash comparison PASS
+  - CSVs generated: customers (10K), products (500), transactions (245,210)
+  - Date range: 2024-07-01 to 2026-06-30
 
 ## Current Task
 None (phase complete)
 
 ## Next Task
-PHASE 1 — Synthetic data generation
+PHASE 2 — PostgreSQL schema and data loading
 
 ## Blockers
 None
@@ -48,31 +40,31 @@ None
 - Seed = 42 for reproducibility (ADR-004)
 - Streamlit Cloud deployment (ADR-005)
 - Star-schema structure (ADR-006)
+- CSVs excluded from git (18 MB too large), generated locally (ADR-007)
 
 ## Last Verification
-2026-09-10 10:10 — All Phase 0 deliverables verified present
+2026-09-10 10:20 — All Phase 1 checks passed (generation, validation, reproducibility)
 
 ## Relevant Files
-- resources/IMPLEMENTATION_PLAN.md
-- resources/prompts/PHASE_01_DATA.md (next phase)
-- AGENTS.md
-- README.md
+- src/data_generator.py
+- tests/test_data.py
+- tests/test_reproducibility.py
+- data/raw/customers.csv (generated, not in git)
+- data/raw/products.csv (generated, not in git)
+- data/raw/transactions.csv (generated, not in git)
+- resources/prompts/PHASE_02_DATABASE.md (next phase)
 
 ## Tests
-- Directory structure: PASS
-- Resource files exist: PASS
-- State files exist: PASS
-- Phase files exist: PASS
-- No secrets: PASS
-- No application code: PASS
+- Data validation (50/50 checks): PASS
+- Reproducibility (MD5 hash match): PASS
 
 ## Resume Instructions
 1. Read this file (STATE.md)
 2. Read resources/IMPLEMENTATION_PLAN.md
-3. Read resources/prompts/PHASE_01_DATA.md
-4. Read project_state/phases/phase_01_data.md
-5. Begin synthetic data generation (src/data_generator.py)
-6. Do NOT skip any Phase 1 requirements
+3. Read resources/prompts/PHASE_02_DATABASE.md
+4. Read project_state/phases/phase_02_database.md
+5. Ensure CSVs exist in data/raw/ (run `python src/data_generator.py` if not)
+6. Begin PostgreSQL schema creation and data loading
 
 ## Plan Compliance
-PASS — All Phase 0 requirements from implementation plan satisfied
+PASS — All Phase 1 requirements satisfied
