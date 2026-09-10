@@ -93,9 +93,9 @@ col_cat, col_rfm = st.columns(2)
 with col_cat:
     st.subheader("Revenue by Category")
     fig_cat = px.bar(
-        category_df, x='category_name', y='total_revenue',
+        category_df, x='category', y='total_revenue',
         title="Revenue Contribution by Product Category",
-        labels={'category_name': 'Category', 'total_revenue': 'Revenue ($)'},
+        labels={'category': 'Category', 'total_revenue': 'Revenue ($)'},
         color='total_revenue', color_continuous_scale='Blues'
     )
     fig_cat.update_yaxes(tickprefix="$")
@@ -153,9 +153,9 @@ st.subheader("Revenue Concentration")
 st.markdown("*This shows how cumulative customer revenue changes as progressively larger portions of the customer base are included.*")
 
 fig_conc = px.line(
-    concentration_df, x='band_name', y='pct_of_total_revenue',
+    concentration_df, x='customer_band', y='pct_of_total_revenue',
     title="Revenue Contribution by Customer Percentile",
-    labels={'band_name': 'Customer Percentile', 'pct_of_total_revenue': 'Cumulative Revenue Share (%)'},
+    labels={'customer_band': 'Customer Percentile', 'pct_of_total_revenue': 'Cumulative Revenue Share (%)'},
     markers=True
 )
 fig_conc.update_yaxes(ticksuffix="%")
