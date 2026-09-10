@@ -1,0 +1,1106 @@
+Objective:
+Produce a live, technically defensible Retail Analytics project by tomorrow 6 PM, with enough SQL complexity, query-performance analysis, business analytics, documentation, and deployment evidence to materially strengthen the Xeno application.
+
+1. Final project architecture
+
+Use this:
+
+                    ┌──────────────────────┐
+                    │ Synthetic Data       │
+                    │ Generator             │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │ CSV / Parquet        │
+                    │ Raw Dataset           │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │ PostgreSQL            │
+                    │ Analytical Database    │
+                    └──────────┬───────────┘
+                               │
+                  ┌────────────┼────────────┐
+                  ▼            ▼            ▼
+             SQL Analytics  Performance   Data Quality
+                  │          Experiments       │
+                  └────────────┼───────────────┘
+                               ▼
+                    ┌──────────────────────┐
+                    │ Python Analytics      │
+                    │ Layer                 │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │ Streamlit Web App     │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                         LIVE DEPLOYMENT
+
+For the 5-hour version, stop here.
+
+Do not add:
+
+Kafka
+Spark
+Airflow
+dbt
+Kubernetes
+FastAPI
+React
+Redis
+LangGraph
+LLM agents inside the product
+authentication
+cloud database infrastructure
+
+Those are not required to satisfy the JD and introduce failure points.
+
+2. The actual deliverable
+
+The final GitHub repository should look approximately like this:
+
+retailpulse/
+│
+├── README.md
+├── requirements.txt
+├── .gitignore
+├── .env.example
+│
+├── data/
+│   ├── raw/
+│   │   └── transactions.csv
+│   └── processed/
+│
+├── database/
+│   ├── schema.sql
+│   ├── indexes.sql
+│   └── seed.py
+│
+├── sql/
+│   ├── kpi_queries.sql
+│   ├── rfm.sql
+│   ├── retention.sql
+│   ├── customer_analysis.sql
+│   └── performance/
+│       ├── before.sql
+│       └── after.sql
+│
+├── src/
+│   ├── config.py
+│   ├── db.py
+│   ├── analytics.py
+│   └── data_generator.py
+│
+├── app/
+│   └── streamlit_app.py
+│
+├── tests/
+│   └── test_data.py
+│
+└── project_state/
+    ├── STATE.md
+    ├── DECISIONS.md
+    ├── EVENTS.md
+    ├── METRICS.md
+    └── phases/
+        ├── phase_01_data.md
+        ├── phase_02_database.md
+        ├── phase_03_analytics.md
+        ├── phase_04_performance.md
+        ├── phase_05_app.md
+        └── phase_06_deployment.md
+
+There is a deliberate separation between:
+
+product artifacts
+
+and
+
+agent-development state.
+
+The latter is what gives you cheap context recovery.
+
+3. Synthetic data design
+
+We want data that supports the business questions.
+
+Don't generate random numbers independently. Generate behavioral relationships.
+
+Entities
+
+Use four tables.
+
+Customers
+customer_id
+signup_date
+city
+age_group
+gender
+acquisition_channel
+customer_segment_ground_truth
+
+Approximately:
+
+10,000 customers
+Products
+product_id
+category
+subcategory
+price
+cost
+
+Approximately:
+
+500 products
+
+Categories:
+
+Electronics
+Fashion
+Beauty
+Home
+Sports
+Grocery
+Accessories
+Transactions
+transaction_id
+customer_id
+transaction_timestamp
+product_id
+quantity
+unit_price
+discount
+amount
+payment_method
+channel
+
+Target:
+
+200,000–500,000 transactions
+
+This is enough to make SQL meaningful while remaining manageable.
+
+Campaign interactions
+
+Optional but valuable:
+
+interaction_id
+customer_id
+campaign_id
+interaction_timestamp
+interaction_type
+converted
+
+But this should be Phase 2, only if time remains.
+
+The core project works without it.
+
+4. Generate realistic customer behavior
+
+This is important.
+
+Don't do:
+
+np.random.randint(...)
+
+for everything.
+
+Create customer behavioral archetypes.
+
+For example:
+
+Champions
+    high frequency
+    high monetary value
+    recent purchases
+
+Loyal
+    medium/high frequency
+    consistent purchases
+
+New
+    recent signup
+    low transaction count
+
+At Risk
+    historically valuable
+    long time since last purchase
+
+Lost
+    long inactivity period
+    historically active
+
+The generator should produce distributions that naturally create these groups.
+
+For example:
+
+customer
+   │
+   ├── propensity_to_purchase
+   ├── average_order_value
+   ├── preferred_category
+   ├── purchase_frequency
+   └── inactivity_probability
+
+Then transactions are sampled based on those latent characteristics.
+
+This makes your analytics results much more meaningful.
+
+5. Data-generation algorithm
+
+Use a fixed random seed.
+
+SEED = 42
+
+This is critical for reproducibility.
+
+Pipeline:
+
+Seed
+ ↓
+Generate customers
+ ↓
+Assign customer behavioral parameters
+ ↓
+Generate products
+ ↓
+Generate transaction timestamps
+ ↓
+Generate purchases according to customer behavior
+ ↓
+Calculate quantity / price / discount
+ ↓
+Generate transaction records
+ ↓
+Validate
+ ↓
+Save CSV
+
+Use:
+
+numpy
+pandas
+Python standard library
+
+No need for Faker unless you want names; don't generate PII.
+
+6. Data validation
+
+Before loading PostgreSQL, automatically validate:
+
+customer_id uniqueness
+product_id uniqueness
+transaction_id uniqueness
+foreign keys
+NULL rates
+negative amounts
+invalid timestamps
+duplicate transactions
+amount consistency
+
+For example:
+
+quantity × unit_price − discount = amount
+
+should approximately hold.
+
+Your generator should fail loudly if validation fails.
+
+7. Database schema
+
+PostgreSQL.
+
+Use a simple star-schema-inspired structure:
+
+                customers
+                    │
+                    │
+                    ▼
+products ───── transactions
+
+Technically:
+
+customers
+   1
+   │
+   │
+   N
+transactions
+   N
+   │
+   │
+   1
+products
+
+Create proper primary and foreign keys.
+
+8. Database initialization
+
+The agent should implement:
+
+database/schema.sql
+database/indexes.sql
+database/seed.py
+
+Execution:
+
+generate data
+     ↓
+create database
+     ↓
+create tables
+     ↓
+load CSV
+     ↓
+verify counts
+
+Expected output:
+
+customers:     10,000
+products:         500
+transactions: 250,000
+
+The actual numbers should be logged from execution rather than hardcoded.
+
+9. SQL analytics layer
+
+This is where the project becomes relevant to Xeno.
+
+Implement at least these analyses.
+
+KPI 1 — Total revenue
+SUM(amount)
+KPI 2 — Active customers
+
+Customers with at least one transaction during the analysis period.
+
+KPI 3 — Average order value
+total revenue
+--------------
+number of transactions
+KPI 4 — Repeat purchase rate
+customers with >= 2 purchases
+-----------------------------
+customers with >= 1 purchase
+10. RFM analysis
+
+This should be one of the central components.
+
+For every customer calculate:
+
+Recency
+analysis_date - last_purchase_date
+Frequency
+number of transactions
+Monetary
+total revenue
+
+Then score:
+
+R score
+F score
+M score
+
+and derive:
+
+Champions
+Loyal Customers
+Potential Loyalists
+At Risk
+Lost
+New Customers
+
+The segmentation rules should be documented.
+
+11. Cohort retention
+
+Calculate:
+
+signup/acquisition month
+        ↓
+purchase activity in subsequent months
+
+Output:
+
+cohort_month
+months_since_acquisition
+customers
+retention_rate
+
+This gives you a genuine analytical artifact rather than simply a chart.
+
+12. Revenue concentration
+
+Calculate:
+
+Top 1%
+Top 5%
+Top 10%
+Top 20%
+
+and their contribution to total revenue.
+
+Business question:
+
+How dependent is the retailer on its highest-value customers?
+
+That naturally connects to Xeno's retention use case.
+
+13. Customer/category analysis
+
+Add:
+
+revenue by category
+transactions by category
+AOV by category
+customers by category
+
+Then allow the dashboard to filter.
+
+14. The query-performance experiment
+
+This is mandatory.
+
+It is one of the strongest reasons to build this project for Xeno.
+
+Create:
+
+sql/performance/before.sql
+sql/performance/after.sql
+
+Start with a deliberately inefficient query.
+
+For example, a date filter using a function around the timestamp.
+
+Measure:
+
+execution time
+planning time
+scan method
+rows scanned
+
+Then optimize.
+
+Potential techniques:
+
+functional predicate rewrite
+index
+composite index
+partitioning discussion
+reduced SELECT *
+
+Do not claim partitioning was implemented unless you actually implement it.
+
+15. Performance methodology
+
+Your README should show:
+
+Query
+ ↓
+Baseline
+ ↓
+EXPLAIN ANALYZE
+ ↓
+Identify bottleneck
+ ↓
+Optimization
+ ↓
+EXPLAIN ANALYZE
+ ↓
+Compare
+
+Create a table:
+
+Metric	Before	After
+Execution time	measured	measured
+Scan type	measured	measured
+Rows processed	measured	measured
+
+Again:
+
+Never invent these values.
+
+16. Streamlit application
+
+The UI should be intentionally simple.
+
+Page structure
+RetailPulse
+Customer Retention & Revenue Intelligence
+
+[Total Revenue] [Customers] [Repeat Rate] [AOV]
+
+Revenue Trend
+────────────────────────
+
+Customer Segments
+────────────────────────
+
+Retention Cohorts
+────────────────────────
+
+Revenue by Category
+────────────────────────
+
+Top Customers
+────────────────────────
+
+Add:
+
+Date filter
+Category filter
+Customer segment filter
+
+if implementation time permits.
+
+17. Caching strategy
+
+You specifically asked for caching.
+
+There are two different kinds of caching here.
+
+Application caching
+
+Use Streamlit's caching mechanisms.
+
+Conceptually:
+
+@st.cache_data
+def get_revenue_data(...):
+    ...
+
+This avoids repeatedly executing expensive analytical queries.
+
+For database connections, use the appropriate resource-level cache.
+
+Agent context caching
+
+This is separate.
+
+Don't store huge transcripts.
+
+Instead maintain compact state files.
+
+18. Agent-state architecture
+
+This is the most important part of your request concerning Antigravity.
+
+Create:
+
+project_state/
+STATE.md
+
+This is the single most important file.
+
+Keep it under ~100 lines.
+
+Structure:
+
+# Project State
+
+## Current Phase
+PHASE_03_ANALYTICS
+
+## Status
+IN_PROGRESS
+
+## Objective
+Implement analytical SQL queries.
+
+## Completed
+- PostgreSQL schema
+- Synthetic dataset
+- Data loading
+- Data validation
+
+## Current Task
+Implement RFM segmentation.
+
+## Next Task
+Implement cohort retention.
+
+## Blockers
+None.
+
+## Important Decisions
+- PostgreSQL
+- Streamlit
+- 250K transactions
+- Seed = 42
+
+## Last Verified
+2026-09-10 14:30
+
+## Files Changed
+- sql/rfm.sql
+- src/analytics.py
+
+## Tests
+Data validation: PASS
+DB connectivity: PASS
+Schema validation: PASS
+
+## Resume Instructions
+Continue RFM implementation. Do not redesign architecture.
+
+An incoming agent only needs to read this first.
+
+19. Event log
+
+Create:
+
+project_state/EVENTS.md
+
+Append-only.
+
+Example:
+
+## 2026-09-10 14:10
+Agent: data-agent
+Phase: PHASE_01_DATA
+Event: DATA_GENERATION_COMPLETE
+Result: PASS
+Details:
+- customers=10000
+- products=500
+- transactions=250000
+
+## 2026-09-10 14:32
+Agent: database-agent
+Phase: PHASE_02_DATABASE
+Event: SCHEMA_CREATED
+Result: PASS
+
+## 2026-09-10 14:41
+Agent: database-agent
+Phase: PHASE_02_DATABASE
+Event: DATA_LOAD
+Result: PASS
+
+This gives you an audit trail without huge context.
+
+20. Decision log
+
+Create:
+
+project_state/DECISIONS.md
+
+Example:
+
+# Architectural Decisions
+
+## ADR-001
+Decision:
+Use PostgreSQL.
+
+Reason:
+Strong SQL support and straightforward local/deployment workflow.
+
+Rejected:
+SQLite.
+
+Reason:
+Less representative for the target role.
+
+## ADR-002
+Decision:
+Use Streamlit.
+
+Reason:
+Fastest route to a live analytical application.
+
+Rejected:
+React + FastAPI.
+
+Reason:
+Excessive implementation time for current objective.
+
+This prevents agents from repeatedly reconsidering decisions.
+
+21. Metrics log
+
+Create:
+
+project_state/METRICS.md
+
+Store actual measured values.
+
+# Performance Metrics
+
+Dataset:
+250,000 transactions
+
+## Query Q1
+
+Baseline:
+Execution time: 183 ms
+
+Optimized:
+Execution time: 41 ms
+
+Improvement:
+77.6%
+
+Environment:
+Local PostgreSQL
+
+This becomes evidence for your interview.
+
+22. Phase files
+
+Each phase gets one compact file.
+
+Example:
+
+phase_01_data.md
+
+Structure:
+
+# Phase 01 — Data Generation
+
+Status: COMPLETE
+
+## Goal
+Generate reproducible retail transaction dataset.
+
+## Inputs
+None.
+
+## Outputs
+data/raw/customers.csv
+data/raw/products.csv
+data/raw/transactions.csv
+
+## Validation
+PASS
+
+## Commands
+python src/data_generator.py
+
+## Key Results
+customers=10000
+products=500
+transactions=250000
+
+## Known Issues
+None.
+
+## Next Phase
+Database initialization.
+23. Agent handoff protocol
+
+This is where your "transfer of function between AI agents" requirement should be implemented.
+
+Don't have agents communicate through massive messages.
+
+Use:
+
+Agent A
+ ↓
+STATE.md
+EVENTS.md
+phase file
+ ↓
+Agent B
+Handoff format
+
+At the end of every phase:
+
+1. Update STATE.md
+2. Append EVENTS.md
+3. Update phase_X.md
+4. Record decisions
+5. Record metrics
+6. Run verification
+7. State exact next task
+
+Agent B starts by reading:
+
+STATE.md
+DECISIONS.md
+current phase file
+
+Only then inspect relevant source files.
+
+This dramatically reduces context consumption.
+
+24. Backtracking protocol
+
+Suppose the dashboard breaks.
+
+Don't tell the next agent:
+
+"The project is broken."
+
+Record:
+
+## BACKTRACK EVENT
+
+Phase:
+PHASE_05_APP
+
+Failure:
+RFM query returns duplicate customers.
+
+Observed:
+customer_id appears multiple times.
+
+Likely Cause:
+Incorrect JOIN.
+
+Last Known Good:
+PHASE_03_ANALYTICS
+
+Action:
+Debug sql/rfm.sql before modifying application code.
+
+Then the next agent knows where to investigate.
+
+25. Critical rule for AI agents
+
+Put this in the project's root-level AGENTS.md.
+
+Something like:
+
+# Agent Operating Rules
+
+1. Read project_state/STATE.md before making changes.
+2. Read project_state/DECISIONS.md before changing architecture.
+3. Do not redesign completed phases without evidence of failure.
+4. Work only on the current phase unless explicitly instructed otherwise.
+5. Prefer modifying existing implementation over creating parallel implementations.
+6. Run relevant verification after every meaningful change.
+7. Never fabricate test results, benchmark results, dataset sizes, or deployment status.
+8. Record important events in project_state/EVENTS.md.
+9. Update STATE.md when phase status changes.
+10. Record architectural changes in DECISIONS.md.
+11. Keep state files concise.
+12. Do not add dependencies unless necessary.
+13. Do not introduce infrastructure not required by the project objective.
+14. If blocked, diagnose and document the blocker before attempting broad redesign.
+15. Preserve working functionality while adding new functionality.
+
+This is far more useful than asking an AI agent to "work autonomously."
+
+26. Don't create specialized agents unless necessary
+
+You mentioned transferring functions between AI agents.
+
+You can model the project as six roles:
+
+DATA AGENT
+     ↓
+DATABASE AGENT
+     ↓
+ANALYTICS AGENT
+     ↓
+PERFORMANCE AGENT
+     ↓
+APP AGENT
+     ↓
+DEPLOYMENT AGENT
+
+But these don't need to be six autonomous agents.
+
+They can simply be six sequential responsibilities executed by Antigravity or another coding agent.
+
+That is much safer under a 5-hour deadline.
+
+27. Phase dependency graph
+
+Your project should have explicit dependencies:
+
+PHASE 0
+Bootstrap
+   │
+   ▼
+PHASE 1
+Data Generation
+   │
+   ▼
+PHASE 2
+PostgreSQL
+   │
+   ▼
+PHASE 3
+Analytics
+   │
+   ├──────────────┐
+   ▼              ▼
+PHASE 4        Data QA
+Performance
+   │
+   ▼
+PHASE 5
+Streamlit
+   │
+   ▼
+PHASE 6
+Deployment
+   │
+   ▼
+PHASE 7
+Documentation
+
+Do not parallelize heavily.
+
+The dependencies are too strong.
+
+28. Exact 5-hour execution schedule
+0:00–0:15 — Bootstrap
+
+Agent:
+
+Create repository structure.
+Create AGENTS.md.
+Create project_state/.
+Create STATE.md.
+Create phase files.
+Create requirements.txt.
+
+Nothing else.
+
+0:15–1:00 — Synthetic data
+
+Build:
+
+data_generator.py
+
+Generate:
+
+10K customers
+500 products
+250K transactions
+
+Validate.
+
+Checkpoint.
+
+1:00–1:40 — PostgreSQL
+
+Implement:
+
+schema.sql
+seed.py
+
+Load data.
+
+Verify counts.
+
+Checkpoint.
+
+1:40–2:30 — Analytics
+
+Implement:
+
+kpi_queries.sql
+rfm.sql
+retention.sql
+customer_analysis.sql
+
+Minimum outputs:
+
+Revenue
+AOV
+Repeat rate
+RFM
+Retention
+Category analysis
+Revenue concentration
+
+Checkpoint.
+
+2:30–3:10 — Performance
+
+Implement:
+
+before.sql
+after.sql
+
+Run:
+
+EXPLAIN ANALYZE
+
+Measure.
+
+Record:
+
+METRICS.md
+
+Checkpoint.
+
+3:10–4:10 — Streamlit
+
+Build the dashboard.
+
+Do not spend 60 minutes making it beautiful.
+
+Make it:
+
+readable
+functional
+stable
+responsive
+4:10–4:40 — Deployment
+
+Deploy.
+
+Verify from an external browser.
+
+This is important.
+
+A local:
+
+localhost:8501
+
+is not a live hosted project.
+
+You need a public URL.
+
+4:40–5:00 — Documentation
+
+README must contain:
+
+Problem
+Architecture
+Dataset
+Schema
+Analytics
+Query optimization
+Results
+Business insights
+Tech stack
+How to run
+Live demo
+
+Add screenshots.
+
+Commit everything.
+
+29. Definition of Done
+
+Do not allow an agent to say "done" unless these pass.
+
+[ ] Repository works from clean setup
+[ ] Dataset generation is reproducible
+[ ] Data validation passes
+[ ] PostgreSQL schema created
+[ ] Data successfully loaded
+[ ] SQL KPI queries work
+[ ] RFM works
+[ ] Cohort retention works
+[ ] Performance experiment exists
+[ ] EXPLAIN ANALYZE evidence recorded
+[ ] Streamlit application works
+[ ] Application is publicly accessible
+[ ] README explains architecture
+[ ] README contains business insights
+[ ] Git history is clean
+[ ] No secrets committed
+[ ] STATE.md is current
+[ ] EVENTS.md is current
